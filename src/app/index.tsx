@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { parseChannelRef } from '../lib/parseUrl';
 import { colors } from '../components/theme';
 import { getRecentChannels, removeRecentChannel, useSettings, type RecentChannel } from '../lib/settings';
 
@@ -10,6 +11,8 @@ export default function Home() {
   const { settings, loaded } = useSettings();
   const [recent, setRecent] = useState<RecentChannel[]>([]);
   const [input, setInput] = useState('');
+  const [onlyVideo, setOnlyVideo] = useState(false);
+  const isVideo = parseChannelRef(input)?.kind === 'video';
 
   useFocusEffect(
     useCallback(() => {
@@ -17,12 +20,17 @@ export default function Home() {
     }, []),
   );
 
-  const open = (text: string) => text.trim() && router.push({ pathname: '/open', params: { input: text.trim() } });
+  const open = (text: string, video = onlyVideo) =>
+    text.trim() &&
+    router.push({
+      pathname: '/open',
+      params: { input: text.trim(), ...(parseChannelRef(text)?.kind === 'video' ? { mode: video ? 'video' : 'channel' } : {}) },
+    });
   const paste = async () => {
     const t = await Clipboard.getStringAsync();
     if (t) {
       setInput(t);
-      open(t);
+      if (parseChannelRef(t)?.kind !== 'video') open(t);
     }
   };
 
@@ -61,6 +69,14 @@ export default function Home() {
             <Text style={styles.btnText}>{input ? 'Открыть' : 'Вставить'}</Text>
           </Pressable>
         </View>
+        {isVideo && (
+          <Pressable style={styles.checkRow} onPress={() => setOnlyVideo((v) => !v)} hitSlop={8}>
+            <View style={[styles.box, onlyVideo && styles.boxOn]}>
+              {onlyVideo && <Text style={styles.tick}>✓</Text>}
+            </View>
+            <Text style={styles.checkText}>Открыть только это видео (а не весь канал)</Text>
+          </Pressable>
+        )}
       </View>
       <FlatList
         data={recent}
@@ -107,6 +123,11 @@ const styles = StyleSheet.create({
   },
   btn: { backgroundColor: colors.chipActive, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
   btnText: { color: '#fff', fontWeight: '600' },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  box: { width: 22, height: 22, borderRadius: 5, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  boxOn: { backgroundColor: colors.chipActive, borderColor: colors.chipActive },
+  tick: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  checkText: { flex: 1, color: colors.text, fontSize: 14 },
   section: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, fontWeight: '700', color: colors.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.border },

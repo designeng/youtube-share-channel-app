@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../components/theme';
 import { listGeminiModels, listOpenRouterFreeModels, type AiProvider, type ModelOption } from '../lib/ai';
 import { useSettings, type Settings } from '../lib/settings';
@@ -56,6 +57,7 @@ function Field({
 
 export default function SettingsScreen() {
   const { settings, update } = useSettings();
+  const insets = useSafeAreaInsets();
   const [models, setModels] = useState<ModelOption[]>();
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string>();
@@ -177,17 +179,18 @@ export default function SettingsScreen() {
         help="Сколько хранить готовый обзор фрагмента видео, чтобы не запрашивать AI повторно. По умолчанию 60 (1 час), 0 — не кешировать. «Перегенерировать» всегда обновляет кеш."
       />
 
-      <Modal visible={!!models} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModels(undefined)}>
+      <Modal visible={!!models} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={() => setModels(undefined)}>
         <View style={{ flex: 1 }}>
-          <View style={styles.modalHead}>
+          <View style={[styles.modalHead, { paddingTop: 16 + insets.top }]}>
             <Text style={styles.section}>Модели ({models?.length ?? 0})</Text>
-            <Pressable onPress={() => setModels(undefined)} hitSlop={10}>
+            <Pressable onPress={() => setModels(undefined)} hitSlop={16}>
               <Text style={styles.link}>Закрыть</Text>
             </Pressable>
           </View>
           <FlatList
             data={models}
             keyExtractor={(m) => m.id}
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
             renderItem={({ item }) => (
               <Pressable
                 style={({ pressed }) => [styles.modelRow, pressed && { opacity: 0.6 }]}

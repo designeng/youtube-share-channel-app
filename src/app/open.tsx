@@ -8,14 +8,20 @@ import { resolveChannel } from '../lib/youtubeApi';
 
 /** Resolves any shared YouTube link (channel, handle, video) to a channel and opens it. */
 export default function OpenScreen() {
-  const { input } = useLocalSearchParams<{ input: string }>();
+  const { input, mode } = useLocalSearchParams<{ input: string; mode?: 'video' | 'channel' }>();
   const { settings, loaded } = useSettings();
   const ref = useMemo(() => parseChannelRef(String(input ?? '')), [input]);
   const [apiError, setError] = useState<string>();
+  const [choice, setChoice] = useState<'video' | 'channel' | undefined>(mode);
+  const needChoice = ref?.kind === 'video' && !choice;
   const error = ref ? apiError : `Это не похоже на ссылку на YouTube-канал:\n${input}`;
 
   useEffect(() => {
-    if (!loaded || !ref) return;
+    if (!loaded || !ref || needChoice) return;
+    if (ref.kind === 'video' && choice === 'video') {
+      router.replace({ pathname: '/video/[id]', params: { id: ref.value } });
+      return;
+    }
     let cancelled = false;
     resolveChannel(ref, settings.youtubeKey)
       .then(async (ch) => {
@@ -27,11 +33,21 @@ export default function OpenScreen() {
     return () => {
       cancelled = true;
     };
-  }, [ref, loaded, settings.youtubeKey]);
+  }, [ref, loaded, settings.youtubeKey, needChoice, choice]);
 
   return (
     <View style={styles.c}>
-      {error ? (
+      {needChoice ? (
+        <>
+          <Text style={styles.err}>Это ссылка на видео</Text>
+          <Pressable style={styles.btn} onPress={() => setChoice('video')}>
+            <Text style={styles.btnText}>Открыть только видео</Text>
+          </Pressable>
+          <Pressable style={styles.btn} onPress={() => setChoice('channel')}>
+            <Text style={styles.btnText}>Открыть весь канал</Text>
+          </Pressable>
+        </>
+      ) : error ? (
         <>
           <Text style={styles.err}>{error}</Text>
           {/key|ключ/i.test(error) && (
