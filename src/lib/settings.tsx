@@ -8,6 +8,8 @@ export type Settings = AiConfig & {
   youtubeKey: string;
   /** BCP-47-ish code for transcripts, e.g. "ru", "en" */
   transcriptLang: string;
+  /** How long a generated AI review stays cached, in minutes. 0 disables caching. */
+  cacheTtlMin: number;
 };
 
 const SECRET_KEYS = ['youtubeKey', 'geminiKey', 'openrouterKey'] as const;
@@ -21,6 +23,7 @@ const DEFAULTS: Settings = {
   openrouterModel: DEFAULT_OPENROUTER_MODEL,
   outputLanguage: 'русский',
   transcriptLang: 'ru',
+  cacheTtlMin: 60,
 };
 
 const PREFS_KEY = 'prefs.v1';
@@ -103,11 +106,21 @@ export async function removeRecentChannel(id: string) {
 
 // ---- AI review cache -------------------------------------------------------
 
-const reviewKey = (videoId: string, target: number | 'all') => `review.v1:${videoId}:${target}`;
+const reviewKey = (videoId: string, target: number | 'all') => `review.v2:${videoId}:${target}`;
 
-export async function getCachedReview(videoId: string, target: number | 'all') {
-  return AsyncStorage.getItem(reviewKey(videoId, target));
+/** Returns the cached review text if it is younger than ttlMin minutes; drops it otherwise. */
+export async function getCachedReview(videoId: string, target: number | 'all', ttlMin: number) {
+  const key = reviewKey(videoId, target);
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const { text, ts } = JSON.parse(raw) as { text: string; ts: number };
+    if (ttlMin > 0 && text && Date.now() - ts < ttlMin * 60_000) return text;
+    await AsyncStorage.removeItem(key);
+  } catch {}
+  return null;
 }
-export async function setCachedReview(videoId: string, target: number | 'all', text: string) {
-  return AsyncStorage.setItem(reviewKey(videoId, target), text);
+export async function setCachedReview(videoId: string, target: number | 'all', text: string, ttlMin: number) {
+  if (ttlMin <= 0) return;
+  return AsyncStorage.setItem(reviewKey(videoId, target), JSON.stringify({ text, ts: Date.now() }));
 }

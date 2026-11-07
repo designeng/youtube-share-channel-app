@@ -166,6 +166,17 @@ export default function SettingsScreen() {
         help="AI пишет обзор на этом языке независимо от языка видео."
       />
 
+      <Field
+        label="Кеш AI-обзоров (минут)"
+        value={String(draft.cacheTtlMin)}
+        onChange={(v) => {
+          const n = parseInt(v.replace(/\D/g, ''), 10);
+          set({ cacheTtlMin: Number.isFinite(n) ? n : 0 });
+        }}
+        placeholder="60"
+        help="Сколько хранить готовый обзор фрагмента видео, чтобы не запрашивать AI повторно. По умолчанию 60 (1 час), 0 — не кешировать. «Перегенерировать» всегда обновляет кеш."
+      />
+
       <Modal visible={!!models} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModels(undefined)}>
         <View style={{ flex: 1 }}>
           <View style={styles.modalHead}>

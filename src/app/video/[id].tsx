@@ -112,12 +112,12 @@ export default function VideoScreen() {
     (async () => {
       const next: Record<string, ReviewState> = {};
       for (const t of [...parts.map((p) => p.index), 'all' as const]) {
-        const text = await getCachedReview(video.id, t);
+        const text = await getCachedReview(video.id, t, settings.cacheTtlMin);
         if (text) next[String(t)] = { text };
       }
       setReviews((r) => ({ ...next, ...r }));
     })();
-  }, [video, parts]);
+  }, [video, parts, settings.cacheTtlMin]);
 
   const seek = useCallback((sec: number) => {
     player.current?.seekTo(sec);
@@ -151,7 +151,7 @@ export default function VideoScreen() {
         const text = await generateReview({ video, chapters: parts, transcript: tr, target }, settings, (status) =>
           patchReview(k, { status }),
         );
-        await setCachedReview(video.id, target, text);
+        await setCachedReview(video.id, target, text, settings.cacheTtlMin);
         patchReview(k, { text, loading: false, status: undefined });
       } catch (e: any) {
         patchReview(k, { error: e.message, loading: false, status: undefined });
@@ -224,6 +224,7 @@ export default function VideoScreen() {
             <Text style={styles.sub}>
               {video.channelTitle} · {formatDate(video.publishedAt)}
               {video.viewCount != null ? ` · ${formatCount(video.viewCount)} просм.` : ''}
+              {video.likeCount != null ? ` · 👍 ${formatCount(video.likeCount)}` : ''}
               {video.durationSec ? ` · ${formatTime(video.durationSec)}` : ''}
             </Text>
 
