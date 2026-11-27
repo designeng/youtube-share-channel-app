@@ -94,7 +94,8 @@ async function mockBackend(page: Page) {
         return route.fulfill({ contentType: 'video/mp4', headers: { 'Access-Control-Allow-Origin': '*' }, body: '0'.repeat(4096) });
       if (url.pathname === '/api/timedtext') return json(route, { events: SEGMENTS });
       if (url.hostname === 'generativelanguage.googleapis.com') {
-        const prompt: string = route.request().postDataJSON().contents[0].parts[0].text;
+        // Without a transcript the video itself comes first, then the task.
+        const prompt: string = route.request().postDataJSON().contents[0].parts.find((p: { text?: string }) => p.text).text;
         const chapter = prompt.match(/Глава \d+ из \d+: «([^»]+)»/)?.[1];
         const title = chapter ? `Обзор главы «${chapter}»` : 'Общий обзор видео';
         return json(route, {

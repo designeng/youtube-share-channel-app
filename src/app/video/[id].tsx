@@ -29,6 +29,7 @@ import { transcriptLangOf } from '../../lib/offline/transcripts';
 import { getCachedReview, setCachedReview, useSettings } from '../../lib/settings';
 import { forgetTranscriptInfo, getTranscript, getTranscriptInfo, originalTrack, pickTrack } from '../../lib/transcript';
 import type { Chapter, Transcript, TranscriptInfo, VideoDetails } from '../../lib/types';
+import { IS_PLAY } from '../../lib/variant';
 import { getVideo } from '../../lib/youtubeApi';
 
 const base = (c?: string) => (c ?? '').toLowerCase().split('-')[0];
@@ -98,7 +99,7 @@ export default function VideoScreen() {
 
   // Caption tracks + default choice (preferred locale; YouTube auto-translation if needed).
   useEffect(() => {
-    if (!loaded || hasSaved) return;
+    if (!loaded || hasSaved || IS_PLAY) return;
     getTranscriptInfo(id, settings.transcriptLang)
       .then((i) => {
         setInfo(i);
@@ -181,7 +182,7 @@ export default function VideoScreen() {
       patchReview(k, { loading: true, error: undefined, status: t().video.gettingTranscript, open: true });
       try {
         const tr = await getAiTranscript();
-        patchReview(k, { status: tr ? t().video.generating : t().video.watching });
+        patchReview(k, { status: tr ? t().video.generating : IS_PLAY ? t().video.watchingPlay : t().video.watching });
         const text = await generateReview({ video, chapters: parts, transcript: tr, target }, settings, (status) =>
           patchReview(k, { status }),
         );
@@ -392,6 +393,7 @@ export default function VideoScreen() {
             {video && aiOpened && (
               <Layer active={mode === 'ai'}>
                 <AiPanel
+                videoId={id}
                   chapters={parts}
                   authored={hasChapters}
                   currentIndex={currentIdx}

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { currentTimecode } from '../../lib/chapters';
 import { errorText } from '../../lib/format';
@@ -11,11 +11,13 @@ import { Banner } from '../ui/Banner';
 import { Button } from '../ui/Button';
 import { AiButton, ChapterRow } from './ChapterRow';
 import { FollowButton, useFollowScroll } from './follow';
+import { ReportDialog } from './ReportDialog';
 import { useShared } from './styles';
 
 export type ReviewState = { text?: string; loading?: boolean; status?: string; error?: string; open?: boolean };
 
 type Props = {
+  videoId: string;
   chapters: Chapter[];
   authored: boolean;
   currentIndex: number;
@@ -30,10 +32,12 @@ type Props = {
 };
 
 export function AiPanel(props: Props) {
-  const { chapters, authored, currentIndex, time, reviews, runningAll, focusIndex, onRunAll, onReview, onSeek } = props;
+  const { videoId, chapters, authored, currentIndex, time, reviews, runningAll, focusIndex, onRunAll, onReview, onSeek } = props;
   const type = useType();
   const shared = useShared();
   const s = useStrings();
+  /** the review being complained about */
+  const [reported, setReported] = useState<{ target: string; text: string }>();
   const ready = chapters.filter((c) => reviews[String(c.index)]?.text).length;
   const untouched = Object.keys(reviews).length === 0;
 
@@ -105,6 +109,7 @@ export function AiPanel(props: Props) {
           <ReviewBlock
             state={reviews.all}
             onTime={seek}
+            onReport={(text) => setReported({ target: 'all', text })}
             onRetry={() => openReview('all', true)}
             activeSec={overviewSec}
             activeRef={target?.startsWith('overview:') ? targetRef : undefined}
@@ -139,6 +144,7 @@ export function AiPanel(props: Props) {
                 <ReviewBlock
                   state={r}
                   onTime={seek}
+                  onReport={(text) => setReported({ target: String(c.index), text })}
                   onRetry={() => openReview(c.index, true)}
                   activeSec={active ? chapterSec : undefined}
                   activeRef={active && target?.startsWith('point:') ? targetRef : undefined}
@@ -149,6 +155,7 @@ export function AiPanel(props: Props) {
         </View>
       </ScrollView>
       {!follow && target !== undefined && <FollowButton testID="ai-follow" time={time} onPress={resume} />}
+      {reported && <ReportDialog videoId={videoId} {...reported} onClose={() => setReported(undefined)} />}
     </View>
   );
 }
@@ -157,11 +164,12 @@ type ReviewProps = {
   state?: ReviewState;
   onTime: (s: number) => void;
   onRetry: () => void;
+  onReport: (text: string) => void;
   activeSec?: number;
   activeRef?: (node: ViewInstance | null) => void;
 };
 
-function ReviewBlock({ state, onTime, onRetry, activeSec, activeRef }: ReviewProps) {
+function ReviewBlock({ state, onTime, onRetry, onReport, activeSec, activeRef }: ReviewProps) {
   const colors = useColors();
   const type = useType();
   const shared = useShared();
@@ -194,6 +202,7 @@ function ReviewBlock({ state, onTime, onRetry, activeSec, activeRef }: ReviewPro
           <View style={styles.actions}>
             <Button small variant="ghost" icon="share" label={s.ai.share} onPress={() => Share.share({ message: state.text! })} />
             <Button small variant="ghost" icon="refresh" label={s.ai.regenerate} onPress={onRetry} />
+            <Button small variant="ghost" icon="flag" label={s.report.button} onPress={() => onReport(state.text!)} />
           </View>
         </View>
       )}

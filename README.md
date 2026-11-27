@@ -35,6 +35,18 @@ npx expo run:android      # или: npx expo run:ios  (нужен Xcode)
 
 Ключи хранятся в `expo-secure-store` (Keychain / Keystore).
 
+## Сборка для Google Play
+
+Флаг `EXPO_PUBLIC_APP_VARIANT=play` собирает вариант без скачивания, транскриптов и OpenRouter (без транскрипта он не работает): AI-обзоры делает Gemini, который смотрит само видео. Заменяемый код не попадает в бандл: [metro.config.js](metro.config.js) подставляет файлы `*.play.ts(x)`.
+
+```bash
+npm run start:play                                   # dev-сервер
+EXPO_PUBLIC_REPORT_URL=https://… make play-build     # dist-play/app-release.aab
+EXPO_PUBLIC_APP_VARIANT=play npm run e2e             # тест Play-варианта
+```
+
+`EXPO_PUBLIC_REPORT_URL` — адрес, принимающий JSON POST с жалобами на AI-тексты (кнопка «Пожаловаться» под обзором). Без него жалоба открывает системное «Поделиться». Для публикации ещё нужны upload key, растущий `versionCode` и privacy policy.
+
 ## Тесты
 
 E2E-тесты интерфейса (Playwright, мобильный вьюпорт Chromium) идут на веб-сборке. Все внешние запросы подменены синтетическими данными, включая YouTube IFrame API, поэтому ключи и сеть не нужны.

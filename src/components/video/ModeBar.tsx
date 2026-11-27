@@ -1,17 +1,20 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStrings } from '../../lib/i18n';
+import { IS_PLAY } from '../../lib/variant';
 import { radius, themed, useColors } from '../theme';
 import { Icon, type IconName } from '../ui/Icon';
 
 export type Mode = 'chapters' | 'transcript' | 'ai' | 'about';
 
-const MODES: { key: Mode; icon: IconName }[] = [
+const ALL_MODES: { key: Mode; icon: IconName }[] = [
   { key: 'chapters', icon: 'chapters' },
   { key: 'transcript', icon: 'transcript' },
   { key: 'ai', icon: 'ai' },
   { key: 'about', icon: 'info' },
 ];
+
+const MODES = ALL_MODES.filter((m) => !(IS_PLAY && m.key === 'transcript'));
 
 /** Bottom bar switching what is shown under the player. */
 export function ModeBar({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {

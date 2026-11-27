@@ -14,6 +14,7 @@ import { confirm } from '../lib/confirm';
 import { useStrings } from '../lib/i18n';
 import { parseChannelRef } from '../lib/parseUrl';
 import { getRecentChannels, removeRecentChannel, useSettings, type RecentChannel } from '../lib/settings';
+import { IS_PLAY } from '../lib/variant';
 
 export default function Home() {
   const { settings, loaded } = useSettings();
@@ -126,7 +127,9 @@ export default function Home() {
         options={{
           headerRight: () => (
             <View style={styles.headerButtons}>
-              <IconButton testID="open-downloads" icon="download" label={s.nav.downloads} onPress={() => router.push('/downloads')} />
+              {!IS_PLAY && (
+                <IconButton testID="open-downloads" icon="download" label={s.nav.downloads} onPress={() => router.push('/downloads')} />
+              )}
               <IconButton icon="settings" label={s.nav.settings} onPress={() => router.push('/settings')} />
             </View>
           ),
