@@ -45,6 +45,25 @@ test.describe('timecodes', () => {
   });
 });
 
+test('timecodes keep the current chapter in view until scrolled by hand', async ({ page }) => {
+  // Low enough that the three chapters do not fit under the player.
+  await page.setViewportSize({ width: 390, height: 480 });
+  await openVideo(page);
+  const last = page.getByTestId('chapter-2');
+
+  await playTo(page, 455);
+  await expect(last).toBeInViewport({ ratio: 1 });
+
+  await page.getByTestId('chapters-list').hover();
+  await page.mouse.wheel(0, -600);
+  await expect(page.getByTestId('chapters-follow')).toBeVisible();
+  await expect(last).not.toBeInViewport({ ratio: 1 });
+
+  await page.getByTestId('chapters-follow').click();
+  await expect(last).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('chapters-follow')).toBeHidden();
+});
+
 test.describe('transcript sync', () => {
   test.beforeEach(async ({ page }) => {
     await openVideo(page);
@@ -119,6 +138,36 @@ test.describe('AI review', () => {
 
     await page.getByText('[4:10]').click();
     expect(await lastSeek(page)).toBe(250);
+  });
+
+  test('highlights the point of the review being played', async ({ page }) => {
+    await openVideo(page);
+    await page.getByTestId('chapter-ai-1').click();
+    // The synthetic review of chapter 1 (3:00–6:00) has one point, at 4:10.
+    const point = page.getByTestId('ai-point-250');
+    await expect(point).not.toHaveAttribute(...SELECTED);
+
+    await playTo(page, 260);
+    await expect(point).toHaveAttribute(...SELECTED);
+    await expect(page.getByTestId('ai-row-1')).toHaveAttribute(...SELECTED);
+
+    await page.getByTestId('ai-follow').click();
+    await expect(point).toBeInViewport({ ratio: 1 });
+
+    await playTo(page, 400);
+    await expect(point).not.toHaveAttribute(...SELECTED);
+    await expect(page.getByTestId('ai-row-2')).toHaveAttribute(...SELECTED);
+  });
+
+  test('highlights the current point of the overview', async ({ page }) => {
+    await openVideo(page);
+    await page.getByTestId('mode-ai').click();
+    await page.getByTestId('ai-overview').click();
+    const point = page.getByTestId('ai-point-250');
+    await expect(point).not.toHaveAttribute(...SELECTED);
+
+    await playTo(page, 300);
+    await expect(point).toHaveAttribute(...SELECTED);
   });
 
   test('keeps generated reviews when switching modes', async ({ page }) => {

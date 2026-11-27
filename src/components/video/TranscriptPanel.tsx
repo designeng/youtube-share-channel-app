@@ -16,11 +16,11 @@ import { lineIndexAt, transcriptLines, type TranscriptLine } from '../../lib/cha
 import { errorText, formatTime } from '../../lib/format';
 import { useStrings } from '../../lib/i18n';
 import type { Transcript } from '../../lib/types';
-import { radius, space, themed, TOUCH, useColors, useType } from '../theme';
+import { radius, space, themed, useType } from '../theme';
 import { Banner } from '../ui/Banner';
 import { Chip } from '../ui/Chip';
-import { Icon } from '../ui/Icon';
 import { StateView } from '../ui/StateView';
+import { FollowButton, VIEW_POSITION } from './follow';
 import { useShared } from './styles';
 
 export type TrackChoice = { languageCode: string; tlang?: string };
@@ -28,8 +28,6 @@ export type TrackOption = { label: string; choice: TrackChoice };
 
 /** Short lines keep the highlight close to what is being said. */
 const LINE_SEC = 10;
-/** Where the current line sits in the list: 0 = top, 1 = bottom. */
-const VIEW_POSITION = 0.3;
 const MAX_SCROLL_RETRIES = 10;
 
 type Props = {
@@ -74,7 +72,6 @@ const Line = memo(function Line({
 });
 
 export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek, onRetry }: Props) {
-  const colors = useColors();
   const shared = useShared();
   const styles = useStyles();
   const s = useStrings();
@@ -172,10 +169,7 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
             {...webScrollProps}
           />
           {!follow && current >= 0 && (
-            <Pressable testID="transcript-follow" role="button" style={styles.followBtn} onPress={() => setFollow(true)}>
-              <Icon name="follow" size={18} color={colors.onPrimary} />
-              <Text style={styles.followText}>{s.transcript.toCurrent(formatTime(time))}</Text>
-            </Pressable>
+            <FollowButton testID="transcript-follow" time={time} onPress={() => setFollow(true)} />
           )}
         </View>
       )}
@@ -200,18 +194,4 @@ const useStyles = themed((colors) => ({
   lineActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   pressed: { opacity: 0.6 },
   text: { flex: 1 },
-  followBtn: {
-    position: 'absolute',
-    bottom: space.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    minHeight: TOUCH,
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.22)',
-  },
-  followText: { color: colors.onPrimary, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },
 }));
