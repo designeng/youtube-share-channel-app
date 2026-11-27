@@ -355,6 +355,7 @@ export default function VideoScreen() {
               chapters={parts}
               authored={hasChapters}
               currentIndex={currentIdx}
+              time={time}
               reviews={reviews}
               onSeek={seek}
               onReview={reviewFromChapters}
@@ -364,6 +365,7 @@ export default function VideoScreen() {
               chapters={parts}
               authored={hasChapters}
               currentIndex={currentIdx}
+              time={time}
               reviews={reviews}
               runningAll={runningAll}
               focusIndex={aiFocus}

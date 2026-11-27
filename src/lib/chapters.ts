@@ -67,6 +67,29 @@ export function segmentsFor(segments: TranscriptSegment[], ch: Chapter): Transcr
   return segments.filter((s) => s.start >= ch.start - 0.5 && s.start < ch.end);
 }
 
+/** The first timecode mentioned in a piece of AI text, in seconds. */
+export function firstTimecode(text: string): number | undefined {
+  const m = text.match(/\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b/);
+  return m ? toSeconds(m[0]) : undefined;
+}
+
+/**
+ * Which timecode of an AI text is being played at `time`: the latest one already reached.
+ * Only timecodes within [from, to) count, and none once playback has left that range.
+ */
+export function currentTimecode(text: string, time: number, from = 0, to = Infinity): number | undefined {
+  // The same slack as for transcript lines.
+  const now = time + 0.5;
+  if (now < from || time >= to) return undefined;
+  let found: number | undefined;
+  for (const line of text.split('\n')) {
+    // A line may be a range such as [1:00–2:00]; its start is what counts.
+    const sec = firstTimecode(line);
+    if (sec !== undefined && sec >= from && sec < to && sec <= now && (found === undefined || sec > found)) found = sec;
+  }
+  return found;
+}
+
 export type TranscriptLine = { start: number; text: string };
 
 /** Groups caption segments into lines that each span at least `everySec` seconds. */

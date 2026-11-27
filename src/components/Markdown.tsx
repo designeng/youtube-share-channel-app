@@ -3,8 +3,9 @@
  * Timecodes like [12:34] / 1:02:03 become tappable (seek the player).
  */
 import { Fragment, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { themed } from './theme';
+import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { firstTimecode } from '../lib/chapters';
+import { radius, themed } from './theme';
 
 const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|\[?\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b\]?)/g;
 
@@ -51,16 +52,45 @@ export function InlineText({ text, onTime }: { text: string; onTime?: (sec: numb
   );
 }
 
-export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number) => void }) {
+type Props = {
+  text: string;
+  onTime?: (sec: number) => void;
+  /** blocks about this moment of the video are highlighted */
+  activeSec?: number;
+  /** given to the first highlighted block */
+  activeRef?: (node: ViewInstance | null) => void;
+};
+
+export function Markdown({ text, onTime, activeSec, activeRef }: Props) {
   const styles = useStyles();
   const blocks: ReactNode[] = [];
   const lines = text.replace(/\r/g, '').split('\n');
   let para: string[] = [];
+  let found = false;
+  const push = (source: string, node: ReactNode) => {
+    const sec = firstTimecode(source);
+    const active = sec !== undefined && sec === activeSec;
+    const first = active && !found;
+    found ||= active;
+    blocks.push(
+      <View
+        key={blocks.length}
+        ref={first ? activeRef : undefined}
+        testID={sec === undefined ? undefined : `ai-point-${sec}`}
+        aria-selected={sec === undefined ? undefined : active}
+        style={[styles.block, active && styles.blockActive]}
+      >
+        {node}
+      </View>,
+    );
+  };
   const flush = () => {
     if (para.length) {
-      blocks.push(
-        <Text key={blocks.length} style={styles.p}>
-          <InlineText text={para.join(' ')} onTime={onTime} />
+      const joined = para.join(' ');
+      push(
+        joined,
+        <Text style={styles.p}>
+          <InlineText text={joined} onTime={onTime} />
         </Text>,
       );
       para = [];
@@ -73,8 +103,9 @@ export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number
     if (!line.trim()) flush();
     else if (h) {
       flush();
-      blocks.push(
-        <Text key={blocks.length} style={[styles.h, h[1].length <= 2 ? styles.h1 : styles.h3]}>
+      push(
+        h[2],
+        <Text style={[styles.h, h[1].length <= 2 ? styles.h1 : styles.h3]}>
           <InlineText text={h[2].replace(/\*\*/g, '')} onTime={onTime} />
         </Text>,
       );
@@ -82,8 +113,9 @@ export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number
       flush();
       const indent = Math.min(3, Math.floor(li[1].length / 2));
       const bullet = /\d/.test(li[2]) ? li[2] : '•';
-      blocks.push(
-        <View key={blocks.length} style={[styles.li, { paddingLeft: 4 + indent * 14 }]}>
+      push(
+        li[3],
+        <View style={[styles.li, { paddingLeft: 4 + indent * 14 }]}>
           <Text style={styles.bullet}>{bullet}</Text>
           <Text style={styles.liText}>
             <InlineText text={li[3]} onTime={onTime} />
@@ -100,6 +132,8 @@ export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number
 }
 
 const useStyles = themed((colors) => ({
+  block: { borderLeftWidth: 3, borderColor: 'transparent', borderRadius: radius.sm, paddingLeft: 4 },
+  blockActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   p: { fontSize: 15, lineHeight: 22, color: colors.text },
   h: { color: colors.text, fontWeight: '700', marginTop: 8 },
   h1: { fontSize: 18 },
