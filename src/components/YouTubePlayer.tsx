@@ -6,6 +6,7 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef, type ComponentType, type Ref } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
+import { PLAYER_POLL_MS, type PlayerHandle, type PlayerProps } from './player';
 
 // react-native-webview 14 typings collapse to `never` under RN 0.88 types; use a narrow local type.
 type WebViewRef = { injectJavaScript: (js: string) => void };
@@ -13,21 +14,6 @@ type NavRequest = { url: string; isTopFrame?: boolean };
 const WebView = RNWebView as unknown as ComponentType<Record<string, unknown> & { ref?: Ref<WebViewRef> }>;
 
 const ORIGIN = 'https://channelviewer.app';
-
-export type PlayerHandle = {
-  seekTo: (sec: number) => void;
-  play: () => void;
-  pause: () => void;
-};
-
-type Props = {
-  videoId: string;
-  height: number;
-  startSec?: number;
-  onTime?: (sec: number) => void;
-  onError?: (code: number) => void;
-  onReady?: () => void;
-};
 
 const html = (videoId: string, start: number) => `<!DOCTYPE html>
 <html><head>
@@ -44,14 +30,14 @@ const html = (videoId: string, start: number) => `<!DOCTYPE html>
       playerVars:{playsinline:1,rel:0,start:${Math.floor(start)},origin:${JSON.stringify(ORIGIN)},enablejsapi:1},
       events:{
         onReady:function(){post({type:'ready'});
-          setInterval(function(){try{post({type:'time',t:player.getCurrentTime()})}catch(e){}},1000);},
+          setInterval(function(){try{post({type:'time',t:player.getCurrentTime()})}catch(e){}},${PLAYER_POLL_MS});},
         onStateChange:function(e){post({type:'state',s:e.data})},
         onError:function(e){post({type:'error',code:e.data})}
       }});
   }
 </script></body></html>`;
 
-export const YouTubePlayer = forwardRef<PlayerHandle, Props>(function YouTubePlayer(
+export const YouTubePlayer = forwardRef<PlayerHandle, PlayerProps>(function YouTubePlayer(
   { videoId, height, startSec = 0, onTime, onError, onReady },
   ref,
 ) {
@@ -107,11 +93,3 @@ const styles = StyleSheet.create({
   wrap: { width: '100%', backgroundColor: '#000' },
   web: { flex: 1, backgroundColor: '#000' },
 });
-
-/** Human readable IFrame API error codes. */
-export function playerErrorText(code: number): string {
-  if (code === 101 || code === 150) return 'Автор запретил встраивание этого видео.';
-  if (code === 100) return 'Видео удалено или приватное.';
-  if (code === 152 || code === 153) return 'Плеер отклонил встраивание (ошибка конфигурации).';
-  return `Ошибка плеера (${code}).`;
-}
