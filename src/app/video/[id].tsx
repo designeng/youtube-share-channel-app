@@ -1,6 +1,8 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playerErrorText, type PlayerHandle } from '../../components/player';
 import { AboutPanel } from '../../components/video/AboutPanel';
 import { AiPanel, type ReviewState } from '../../components/video/AiPanel';
@@ -35,7 +37,8 @@ function savedLabel(t: Transcript) {
 export default function VideoScreen() {
   const { id, title } = useLocalSearchParams<{ id: string; title?: string }>();
   const { settings, loaded } = useSettings();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const player = useRef<PlayerHandle>(null);
 
   // A downloaded copy gives the video details, timecodes, transcripts and the file itself without a network.
@@ -196,7 +199,12 @@ export default function VideoScreen() {
   };
 
   const currentIdx = parts.findIndex((c) => time >= c.start && time < c.end);
-  const h = Math.round((width * 9) / 16);
+  // A phone turned sideways shows only the player. Errors keep the full layout so their banner stays visible.
+  const failed = playLocal ? fileError : playerError != null;
+  const fullscreen = Platform.OS !== 'web' && width > height && height < 600 && !failed;
+  const h = fullscreen
+    ? height - insets.top - insets.bottom
+    : Math.round(Platform.OS === 'web' ? (width * 9) / 16 : Math.min((width * 9) / 16, height / 2));
 
   const review = (target: number | 'all', force?: boolean) => runReview(target, force).catch(() => {});
 
@@ -245,8 +253,15 @@ export default function VideoScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen options={{ title: video?.title ?? title ?? '' }} />
+    <View
+      style={[
+        styles.screen,
+        fullscreen && styles.fullscreen,
+        fullscreen && { paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right },
+      ]}
+    >
+      <Stack.Screen options={{ title: video?.title ?? title ?? '', headerShown: !fullscreen }} />
+      <StatusBar hidden={fullscreen} style="dark" />
       {playLocal ? (
         <LocalPlayer
           ref={player}
@@ -273,59 +288,61 @@ export default function VideoScreen() {
         </View>
       )}
 
-      {video && (
-        <DownloadBar
-          video={video}
-          record={record}
-          playingFile={playLocal}
-          onPlayFile={playLocalFromHere}
-          onDelete={removeDownload}
-        />
-      )}
-
-      <View style={styles.content}>
-        {mode === 'transcript' ? (
-          <TranscriptPanel
-            transcript={savedCurrent ?? transcript}
-            loading={!hasSaved && trLoading}
-            error={hasSaved ? undefined : trError}
-            options={savedOptions?.length ? savedOptions : trackOptions}
-            choice={savedCurrent ? choiceOf(savedCurrent) : choice}
-            time={time}
-            onChoose={hasSaved ? setChoice : selectChoice}
-            onSeek={seek}
+      <View style={fullscreen ? styles.hidden : styles.content}>
+        {video && (
+          <DownloadBar
+            video={video}
+            record={record}
+            playingFile={playLocal}
+            onPlayFile={playLocalFromHere}
+            onDelete={removeDownload}
           />
-        ) : error ? (
-          <Text style={[shared.error, styles.pad]}>{error}</Text>
-        ) : !video ? (
-          <ActivityIndicator style={{ margin: 24 }} />
-        ) : mode === 'chapters' ? (
-          <ChaptersPanel
-            chapters={parts}
-            authored={hasChapters}
-            currentIndex={currentIdx}
-            reviews={reviews}
-            onSeek={seek}
-            onReview={reviewFromChapters}
-          />
-        ) : mode === 'ai' ? (
-          <AiPanel
-            chapters={parts}
-            authored={hasChapters}
-            currentIndex={currentIdx}
-            reviews={reviews}
-            runningAll={runningAll}
-            focusIndex={aiFocus}
-            onRunAll={runAllChapters}
-            onReview={review}
-            onSeek={seek}
-          />
-        ) : (
-          <AboutPanel video={video} onSeek={seek} />
         )}
-      </View>
 
-      <ModeBar mode={mode} onChange={changeMode} />
+        <View style={styles.content}>
+          {mode === 'transcript' ? (
+            <TranscriptPanel
+              transcript={savedCurrent ?? transcript}
+              loading={!hasSaved && trLoading}
+              error={hasSaved ? undefined : trError}
+              options={savedOptions?.length ? savedOptions : trackOptions}
+              choice={savedCurrent ? choiceOf(savedCurrent) : choice}
+              time={time}
+              onChoose={hasSaved ? setChoice : selectChoice}
+              onSeek={seek}
+            />
+          ) : error ? (
+            <Text style={[shared.error, styles.pad]}>{error}</Text>
+          ) : !video ? (
+            <ActivityIndicator style={{ margin: 24 }} />
+          ) : mode === 'chapters' ? (
+            <ChaptersPanel
+              chapters={parts}
+              authored={hasChapters}
+              currentIndex={currentIdx}
+              reviews={reviews}
+              onSeek={seek}
+              onReview={reviewFromChapters}
+            />
+          ) : mode === 'ai' ? (
+            <AiPanel
+              chapters={parts}
+              authored={hasChapters}
+              currentIndex={currentIdx}
+              reviews={reviews}
+              runningAll={runningAll}
+              focusIndex={aiFocus}
+              onRunAll={runAllChapters}
+              onReview={review}
+              onSeek={seek}
+            />
+          ) : (
+            <AboutPanel video={video} onSeek={seek} />
+          )}
+        </View>
+
+        <ModeBar mode={mode} onChange={changeMode} />
+      </View>
     </View>
   );
 }
@@ -333,6 +350,8 @@ export default function VideoScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flex: 1 },
+  fullscreen: { backgroundColor: '#000' },
+  hidden: { display: 'none' },
   pad: { padding: 12 },
   banner: { backgroundColor: '#fff4e5', padding: 10, gap: 4 },
   bannerText: { color: '#8a4b00' },
