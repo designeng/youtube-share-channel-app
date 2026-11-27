@@ -22,6 +22,7 @@ import { Chip } from '../ui/Chip';
 import { StateView } from '../ui/StateView';
 import { FollowButton, VIEW_POSITION } from './follow';
 import { useShared } from './styles';
+import type { TranscriptNotice } from './useAiTranslation';
 
 export type TrackChoice = { languageCode: string; tlang?: string };
 export type TrackOption = { label: string; choice: TrackChoice };
@@ -41,6 +42,8 @@ type Props = {
   onSeek: (sec: number) => void;
   /** absent when trying again cannot help */
   onRetry?: () => void;
+  /** about the language of the transcript, with translation by AI */
+  notice?: TranscriptNotice;
 };
 
 const Line = memo(function Line({
@@ -71,7 +74,7 @@ const Line = memo(function Line({
   );
 });
 
-export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek, onRetry }: Props) {
+export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek, onRetry, notice }: Props) {
   const shared = useShared();
   const styles = useStyles();
   const s = useStrings();
@@ -137,12 +140,9 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
           ))}
         </ScrollView>
       )}
-      {transcript?.translationFailed && (
+      {notice && !loading && (
         <View style={styles.notice}>
-          <Banner
-            tone="warn"
-            text={s.transcript.translationLimited}
-          />
+          <Banner {...notice} />
         </View>
       )}
       {error && !loading && (

@@ -15,12 +15,14 @@ import { DownloadBar } from '../../components/video/DownloadBar';
 import { LocalPlayer } from '../../components/LocalPlayer';
 import { ModeBar, type Mode } from '../../components/video/ModeBar';
 import { TranscriptPanel, type TrackChoice, type TrackOption } from '../../components/video/TranscriptPanel';
+import { useAiTranslation } from '../../components/video/useAiTranslation';
 import { YouTubePlayer } from '../../components/YouTubePlayer';
 import { generateReview } from '../../lib/ai';
+import { getTranslation } from '../../lib/aiTranslate';
 import { videoParts } from '../../lib/chapters';
 import { errorText } from '../../lib/format';
 import { t, useStrings } from '../../lib/i18n';
-import { deleteDownload, readSavedReviews, saveReviews, useDownload } from '../../lib/offline/manager';
+import { addTranscript, deleteDownload, readSavedReviews, saveReviews, useDownload } from '../../lib/offline/manager';
 import { videoUri } from '../../lib/offline/store';
 import { transcriptLangOf } from '../../lib/offline/transcripts';
 import { getCachedReview, setCachedReview, useSettings } from '../../lib/settings';
@@ -87,7 +89,8 @@ export default function VideoScreen() {
   const selectChoice = (c: TrackChoice) => {
     setTrLoading(true);
     setTrError(undefined);
-    setChoice(c);
+    // Always a new object: the loading effect must run even when the same chip is tapped again.
+    setChoice({ ...c });
   };
 
   // Caption tracks + default choice (preferred locale; YouTube auto-translation if needed).
@@ -106,7 +109,8 @@ export default function VideoScreen() {
   useEffect(() => {
     if (!choice || hasSaved) return;
     let cancelled = false;
-    getTranscript(id, { ...choice, hl: settings.transcriptLang })
+    const translation = choice.tlang ? getTranslation(id, choice.tlang) : undefined;
+    (translation ? Promise.resolve(translation) : getTranscript(id, { ...choice, hl: settings.transcriptLang }))
       .then((t) => !cancelled && setTranscript(t))
       .catch((e) => !cancelled && setTrError(e.message))
       .finally(() => !cancelled && setTrLoading(false));
@@ -253,8 +257,8 @@ export default function VideoScreen() {
 
   const retryTranscript = () => {
     forgetTranscriptInfo(id);
-    // Keep the track the viewer picked; a new object makes the loading effect run again.
-    if (info && choice) return selectChoice({ ...choice });
+    // Keep the track the viewer picked.
+    if (info && choice) return selectChoice(choice);
     setTrError(undefined);
     setInfoAttempt((n) => n + 1);
   };
@@ -264,6 +268,30 @@ export default function VideoScreen() {
     saved?.find((t) => transcriptLangOf(t) === base(settings.transcriptLang)) ??
     saved?.[0];
   const savedOptions = saved?.map((t) => ({ label: savedLabel(t), choice: choiceOf(t) }));
+
+  // Translation by AI is offered when the wanted language could not be had otherwise.
+  const shown = savedCurrent ?? transcript;
+  const savedMissing = hasSaved && !saved.some((t) => transcriptLangOf(t) === base(settings.transcriptLang));
+  const wantedLang = hasSaved
+    ? savedMissing
+      ? base(settings.transcriptLang)
+      : undefined
+    : !trLoading && !trError && !transcript?.translatedTo
+      ? choice?.tlang
+      : undefined;
+  // Kept here, not in the panel: translating goes on while another mode is open.
+  const notice = useAiTranslation({
+    videoId: id,
+    source: wantedLang ? shown : undefined,
+    lang: wantedLang,
+    settings,
+    onTranslated: (result) => {
+      addTranscript(id, result);
+      // Show it, unless another track has been picked meanwhile.
+      if (hasSaved) setChoice(choiceOf(result));
+      else setChoice((c) => (c?.tlang === result.translatedTo ? { ...c! } : c));
+    },
+  });
 
   const playLocalFromHere = () => {
     setFileError(false);
@@ -328,7 +356,7 @@ export default function VideoScreen() {
         <View style={[styles.panel, { paddingLeft: insets.left, paddingRight: insets.right }]}>
           {mode === 'transcript' ? (
             <TranscriptPanel
-              transcript={savedCurrent ?? transcript}
+              transcript={shown}
               loading={!hasSaved && trLoading}
               error={hasSaved ? undefined : trError}
               options={savedOptions?.length ? savedOptions : trackOptions}
@@ -338,6 +366,7 @@ export default function VideoScreen() {
               onSeek={seek}
               // Nothing to retry when YouTube says the video has no captions at all.
               onRetry={info && !info.tracks.length ? undefined : retryTranscript}
+              notice={notice}
             />
           ) : error && !video ? (
             <ScrollView>

@@ -56,7 +56,7 @@ export type Transcript = {
   translatedTo?: string;
   isAuto: boolean;
   segments: TranscriptSegment[];
-  source: 'timedtext' | 'get_transcript';
+  source: 'timedtext' | 'get_transcript' | 'ai';
   /** Requested YouTube auto-translation failed (usually HTTP 429); original language returned. */
   translationFailed?: boolean;
 };

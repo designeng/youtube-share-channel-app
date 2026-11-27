@@ -156,6 +156,10 @@ export const en = {
     translationLimited:
       'YouTube limited subtitle auto-translation (rate limit) — the original is shown. The AI review will still be in your chosen language.',
     loading: 'Loading subtitles…',
+    noLanguage: (lang: string) => `No subtitles in “${lang}” — the original is shown.`,
+    translateWithAi: 'Translate with AI',
+    translating: (lang: string, part: number, total: number) => `Translating → ${lang}: part ${part} of ${total}…`,
+    badTranslation: 'The AI returned an incomplete translation. Try again or choose another model.',
     toCurrent: (time: string) => `Back to current · ${time}`,
     refused: 'YouTube refused to return subtitles (its internal API may have changed).',
   },
