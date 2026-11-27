@@ -15,7 +15,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, space, TOUCH, type } from '../components/theme';
+import { radius, space, themed, TOUCH, useColors, useType } from '../components/theme';
 import { Banner } from '../components/ui/Banner';
 import { Button } from '../components/ui/Button';
 import { Chip } from '../components/ui/Chip';
@@ -26,6 +26,7 @@ import { useScreenInsets } from '../components/ui/layout';
 import { Segmented } from '../components/ui/Segmented';
 import { StateView } from '../components/ui/StateView';
 import { listGeminiModels, listOpenRouterFreeModels, type AiProvider, type ModelOption } from '../lib/ai';
+import { getLanguage, useStrings } from '../lib/i18n';
 import { OFFLINE_LANGS } from '../lib/offline/types';
 import { useSettings, type Settings } from '../lib/settings';
 
@@ -35,6 +36,8 @@ const PROVIDERS: { key: AiProvider; label: string }[] = [
 ];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const type = useType();
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <Text role="heading" style={type.title}>
@@ -55,9 +58,13 @@ type FieldProps = Omit<TextInputProps, 'onChange' | 'value'> & {
 };
 
 function Field({ label, value, onChange, secure, help, link, ...input }: FieldProps) {
-  // While editing, show what was typed: the stored value may be normalized (an empty language becomes "ru").
+  // While editing, show what was typed: the stored value may be normalized (an empty language gets the system one).
   const [draft, setDraft] = useState<string>();
   const [revealed, setRevealed] = useState(false);
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
+  const s = useStrings();
   return (
     <View style={styles.field}>
       <Text style={type.label}>{label}</Text>
@@ -77,7 +84,7 @@ function Field({ label, value, onChange, secure, help, link, ...input }: FieldPr
               icon={revealed ? 'eyeOff' : 'eye'}
               size={20}
               color={colors.muted}
-              label={revealed ? 'Скрыть ключ' : 'Показать ключ'}
+              label={revealed ? s.settings.hideKey : s.settings.showKey}
               onPress={() => setRevealed((r) => !r)}
             />
           ) : undefined
@@ -103,6 +110,10 @@ function Field({ label, value, onChange, secure, help, link, ...input }: FieldPr
 
 export default function SettingsScreen() {
   const { settings, update } = useSettings();
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
+  const s = useStrings();
   const insets = useSafeAreaInsets();
   const screenInsets = useScreenInsets(32);
   const headerHeight = useHeaderHeight();
@@ -143,7 +154,7 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Text style={[type.caption, styles.saved]}>Изменения сохраняются автоматически.</Text>
+        <Text style={[type.caption, styles.saved]}>{s.settings.saved}</Text>
         <Section title="YouTube">
           <Field
             label="YouTube Data API v3 key"
@@ -151,39 +162,36 @@ export default function SettingsScreen() {
             onChange={(youtubeKey) => set({ youtubeKey })}
             secure
             placeholder="AIza…"
-            help="Бесплатно, 10 000 единиц квоты в день (≈ 5 000 страниц по 50 видео). Google Cloud Console → APIs → YouTube Data API v3 → Credentials."
+            help={s.settings.youtubeHelp}
             link="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
           />
           <Field
-            label="Язык субтитров"
+            label={s.settings.transcriptLang}
             value={draft.transcriptLang}
-            onChange={(transcriptLang) => set({ transcriptLang: transcriptLang.trim() || 'ru' })}
-            placeholder="ru"
-            help="Код языка (ru, en, de…). Если такой дорожки нет — используется автоперевод YouTube."
+            onChange={(transcriptLang) => set({ transcriptLang: transcriptLang.trim() || getLanguage() })}
+            placeholder={getLanguage()}
+            help={s.settings.transcriptLangHelp}
           />
         </Section>
 
-        <Section title="Скачивание">
+        <Section title={s.settings.downloading}>
           <View style={styles.switchRow}>
             <View style={[styles.fill, styles.switchText]}>
-              <Text style={type.label}>Только по Wi-Fi</Text>
-              <Text style={type.micro}>
-                Без Wi-Fi приложение предупредит о расходе трафика и спросит разрешения. Если Wi-Fi пропадёт во время
-                загрузки, она остановится.
-              </Text>
+              <Text style={type.label}>{s.settings.wifiOnly}</Text>
+              <Text style={type.micro}>{s.settings.wifiOnlyHelp}</Text>
             </View>
             <Switch
               testID="wifi-only"
-              aria-label="Только по Wi-Fi"
+              aria-label={s.settings.wifiOnly}
               value={draft.wifiOnly}
               onValueChange={(wifiOnly) => set({ wifiOnly })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={Platform.OS === 'android' ? colors.bg : undefined}
-              {...(Platform.OS === 'web' ? { activeThumbColor: colors.bg } : undefined)}
+              trackColor={{ false: colors.border, true: colors.switchOn }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#ffffff'}
+              {...(Platform.OS === 'web' ? { activeThumbColor: '#ffffff' } : undefined)}
             />
           </View>
           <View style={styles.field}>
-            <Text style={type.label}>Субтитры для офлайна</Text>
+            <Text style={type.label}>{s.settings.offlineSubtitles}</Text>
             <View style={styles.chips}>
               {OFFLINE_LANGS.map((l) => {
                 const on = draft.offlineLangs.includes(l.code);
@@ -204,11 +212,11 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
-            <Text style={type.micro}>Сохраняются вместе с видео, плюс дорожка на языке оригинала.</Text>
+            <Text style={type.micro}>{s.settings.offlineSubtitlesHelp}</Text>
           </View>
         </Section>
 
-        <Section title="AI-обзоры">
+        <Section title={s.settings.aiReviews}>
           <Segmented options={PROVIDERS} value={draft.provider} onChange={(provider) => set({ provider })} />
 
           {draft.provider === 'gemini' ? (
@@ -219,7 +227,7 @@ export default function SettingsScreen() {
               onChange={(geminiKey) => set({ geminiKey })}
               secure
               placeholder="AIza…"
-              help="Бесплатный тариф Google AI Studio. Умеет анализировать само видео, если субтитров нет. Ключ:"
+              help={s.settings.geminiHelp}
               link="https://aistudio.google.com/apikey"
             />
           ) : (
@@ -230,41 +238,39 @@ export default function SettingsScreen() {
               onChange={(openrouterKey) => set({ openrouterKey })}
               secure
               placeholder="sk-or-…"
-              help="Бесплатные модели (суффикс :free) имеют дневной лимит запросов. Ключ:"
+              help={s.settings.openrouterHelp}
               link="https://openrouter.ai/keys"
             />
           )}
 
           <View style={styles.field}>
-            <Text style={type.label}>Модель</Text>
+            <Text style={type.label}>{s.settings.model}</Text>
             <View style={styles.modelPick}>
               <View style={styles.fill}>
                 <Input
-                  aria-label="Модель"
+                  aria-label={s.settings.model}
                   value={draft[modelKey]}
                   onChangeText={(v) => set({ [modelKey]: v.trim() } as Partial<Settings>)}
                 />
               </View>
-              <Button variant="secondary" label="Выбрать" onPress={pickModel} loading={modelsLoading} />
+              <Button variant="secondary" label={s.settings.pick} onPress={pickModel} loading={modelsLoading} />
             </View>
             <Text style={type.micro}>
-              {draft.provider === 'gemini'
-                ? '«Выбрать» загрузит список моделей, доступных вашему ключу.'
-                : '«Выбрать» загрузит актуальный список бесплатных моделей. openrouter/free — автоматический выбор бесплатной модели.'}
+              {draft.provider === 'gemini' ? s.settings.geminiModelHelp : s.settings.openrouterModelHelp}
             </Text>
-            {modelsError && <Banner tone="error" text={modelsError} actionLabel="Повторить" onAction={pickModel} />}
+            {modelsError && <Banner tone="error" text={modelsError} actionLabel={s.common.retry} onAction={pickModel} />}
           </View>
 
           <Field
-            label="Язык обзоров"
+            label={s.settings.reviewLang}
             value={draft.outputLanguage}
             onChange={(outputLanguage) => set({ outputLanguage })}
-            placeholder="русский"
-            help="AI пишет обзор на этом языке независимо от языка видео."
+            placeholder={s.settings.reviewLangPlaceholder}
+            help={s.settings.reviewLangHelp}
           />
 
           <Field
-            label="Кеш AI-обзоров (минут)"
+            label={s.settings.cacheTtl}
             value={String(draft.cacheTtlMin)}
             onChange={(v) => {
               const n = parseInt(v.replace(/\D/g, ''), 10);
@@ -272,7 +278,7 @@ export default function SettingsScreen() {
             }}
             placeholder="60"
             keyboardType="number-pad"
-            help="Сколько хранить готовый обзор фрагмента видео, чтобы не запрашивать AI повторно. По умолчанию 60 (1 час), 0 — не кешировать. «Перегенерировать» всегда обновляет кеш. Обзоры скачанных видео хранятся вместе с файлом и не устаревают."
+            help={s.settings.cacheTtlHelp}
           />
         </Section>
       </ScrollView>
@@ -288,15 +294,15 @@ export default function SettingsScreen() {
           {/* An iOS page sheet already starts below the status bar. */}
           <View style={[styles.modalHead, { paddingTop: space.sm + (Platform.OS === 'ios' ? 0 : insets.top) }]}>
             <Text role="heading" style={[type.title, styles.fill]}>
-              Модели ({models?.length ?? 0})
+              {s.settings.models(models?.length ?? 0)}
             </Text>
-            <IconButton icon="close" label="Закрыть" onPress={closeModels} />
+            <IconButton icon="close" label={s.common.close} onPress={closeModels} />
           </View>
           <FlatList
             data={models}
             keyExtractor={(m) => m.id}
             contentContainerStyle={{ paddingBottom: insets.bottom + space.md }}
-            ListEmptyComponent={<StateView icon="ai" title="Список пуст" message="Не нашлось ни одной подходящей модели." />}
+            ListEmptyComponent={<StateView icon="ai" title={s.settings.emptyList} message={s.settings.noModels} />}
             renderItem={({ item }) => {
               const selected = item.id === draft[modelKey];
               return (
@@ -324,7 +330,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   fill: { flex: 1 },
   body: { paddingTop: space.xs, gap: space.xl },
   saved: { paddingHorizontal: space.lg },
@@ -351,4 +357,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rowPressed: { backgroundColor: colors.surface },
-});
+}));

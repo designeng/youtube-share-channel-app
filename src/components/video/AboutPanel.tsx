@@ -1,17 +1,21 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { formatCount, formatDate, formatTime } from '../../lib/format';
+import { useStrings } from '../../lib/i18n';
 import type { VideoDetails } from '../../lib/types';
 import { InlineText } from '../Markdown';
-import { space, type } from '../theme';
-import { shared } from './styles';
+import { space, useType } from '../theme';
+import { useShared } from './styles';
 
 export function AboutPanel({ video, onSeek }: { video: VideoDetails; onSeek: (sec: number) => void }) {
+  const type = useType();
+  const shared = useShared();
+  const s = useStrings();
   const stats = [
-    { label: 'Опубликовано', value: formatDate(video.publishedAt) },
-    video.viewCount != null && { label: 'Просмотры', value: formatCount(video.viewCount) },
-    video.likeCount != null && { label: 'Лайки', value: formatCount(video.likeCount) },
-    !!video.durationSec && { label: 'Длительность', value: formatTime(video.durationSec) },
-  ].filter((s) => !!s);
+    { label: s.about.published, value: formatDate(video.publishedAt) },
+    video.viewCount != null && { label: s.about.views, value: formatCount(video.viewCount) },
+    video.likeCount != null && { label: s.about.likes, value: formatCount(video.likeCount) },
+    !!video.durationSec && { label: s.about.duration, value: formatTime(video.durationSec) },
+  ].filter((stat) => !!stat);
 
   return (
     <ScrollView testID="panel-about" contentContainerStyle={[shared.body, styles.body]}>
@@ -22,10 +26,10 @@ export function AboutPanel({ video, onSeek }: { video: VideoDetails; onSeek: (se
         <Text style={type.caption}>{video.channelTitle}</Text>
       </View>
       <View style={styles.stats}>
-        {stats.map((s) => (
-          <View key={s.label} style={styles.stat}>
-            <Text style={type.micro}>{s.label}</Text>
-            <Text style={type.label}>{s.value}</Text>
+        {stats.map((stat) => (
+          <View key={stat.label} style={styles.stat}>
+            <Text style={type.micro}>{stat.label}</Text>
+            <Text style={type.label}>{stat.value}</Text>
           </View>
         ))}
       </View>
@@ -36,7 +40,7 @@ export function AboutPanel({ video, onSeek }: { video: VideoDetails; onSeek: (se
           </Text>
         </View>
       ) : (
-        <Text style={type.caption}>Автор не добавил описание.</Text>
+        <Text style={type.caption}>{s.about.noDescription}</Text>
       )}
     </ScrollView>
   );

@@ -6,6 +6,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 import { videoParts } from '../chapters';
 import { confirm } from '../confirm';
 import { formatBytes } from '../format';
+import { t } from '../i18n';
 import { getCachedReview } from '../settings';
 import type { VideoDetails } from '../types';
 import { getNetworkKind, onNetworkChange } from './network';
@@ -19,7 +20,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 
 function withTimeout<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
-    const fail = () => reject(new Error('YouTube не отвечает. Проверьте сеть и повторите.'));
+    const fail = () => reject(new Error(t().download.timeout));
     const timer = setTimeout(fail, REQUEST_TIMEOUT_MS);
     signal.addEventListener('abort', fail);
     work.then(resolve, reject).finally(() => {
@@ -28,8 +29,6 @@ function withTimeout<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
     });
   });
 }
-
-const WIFI_LOST = 'Wi-Fi отключился — загрузка остановлена, чтобы не тратить мобильный трафик.';
 
 export type ActiveDownload = {
   videoId: string;
@@ -88,15 +87,14 @@ export function useDownloadList(): DownloadRecord[] {
 /** Asks before using mobile data. Returns undefined when the download must not start. */
 async function allowNetwork(size: number | undefined, wifiOnly: boolean) {
   const kind = await getNetworkKind();
-  if (kind === 'offline') throw new Error('Нет подключения к интернету.');
+  if (kind === 'offline') throw new Error(t().download.offline);
   if (kind === 'wifi') return { mobileAllowed: !wifiOnly };
-  const traffic = size ? `около ${formatBytes(size)}` : 'неизвестный объём';
+  const s = t().download;
+  const traffic = size ? s.sizeAbout(formatBytes(size)) : s.sizeUnknown;
   const ok = await confirm({
-    title: 'Мобильная сеть',
-    message: wifiOnly
-      ? `Wi-Fi не подключён, а скачивание по умолчанию идёт только по Wi-Fi. Всё равно скачать по мобильной сети? Расход трафика: ${traffic}.`
-      : `Wi-Fi не подключён. Скачивание израсходует мобильный трафик: ${traffic}.`,
-    confirmLabel: 'Скачать по мобильной',
+    title: s.mobileTitle,
+    message: wifiOnly ? s.mobileWifiOnly(traffic) : s.mobile(traffic),
+    confirmLabel: s.mobileConfirm,
   });
   return ok ? { mobileAllowed: true } : undefined;
 }
@@ -121,13 +119,13 @@ export async function startDownload(video: VideoDetails, { wifiOnly, langs, revi
     const network = await allowNetwork(stream.size, wifiOnly);
     if (!network || controller.signal.aborted) return setActive(id, undefined);
     if (stream.size && store.freeSpace() < stream.size * 1.1)
-      throw new Error(`Мало места на телефоне: нужно ${formatBytes(stream.size)}.`);
+      throw new Error(t().download.noSpace(formatBytes(stream.size)));
 
     mobileAllowed = network.mobileAllowed;
     if (!mobileAllowed)
       unwatch = onNetworkChange((kind) => {
         if (kind !== 'metered') return;
-        stopReason = WIFI_LOST;
+        stopReason = t().download.wifiLost;
         controller.abort();
       });
 
@@ -167,7 +165,7 @@ export async function startDownload(video: VideoDetails, { wifiOnly, langs, revi
     // The connection usually breaks before the network change is reported, with a native error.
     if (item.phase === 'video' && !controller.signal.aborted) {
       const wifiGone = !mobileAllowed && (await getNetworkKind()) !== 'wifi';
-      error = wifiGone ? WIFI_LOST : 'Связь прервалась. Проверьте сеть и повторите.';
+      error = wifiGone ? t().download.wifiLost : t().download.interrupted;
     }
     if (controllers.get(id) !== controller) return;
     const cancelled = controller.signal.aborted && !stopReason;

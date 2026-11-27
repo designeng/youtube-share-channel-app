@@ -4,6 +4,7 @@
  * iOS moves the documents directory between app updates.
  */
 import { Directory, File, Paths } from 'expo-file-system';
+import { t } from '../i18n';
 import type { DownloadFileOptions, DownloadRecord, SavedReviews } from './types';
 
 const root = () => new Directory(Paths.document, 'downloads');
@@ -69,7 +70,7 @@ export async function downloadVideo(id: string, url: string, options: DownloadFi
     onProgress: ({ bytesWritten, totalBytes }) => options.onProgress(bytesWritten, totalBytes),
   });
   const file = await task.downloadAsync();
-  if (!file?.size) throw new Error('Файл не скачался.');
+  if (!file?.size) throw new Error(t().download.emptyFile);
   const bytes = file.size;
   if (video(id).exists) video(id).delete();
   await part.move(video(id));

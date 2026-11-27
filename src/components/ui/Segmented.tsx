@@ -1,6 +1,6 @@
 /** One choice out of a few equal options. */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius } from '../theme';
+import { Pressable, Text, View } from 'react-native';
+import { radius, themed } from '../theme';
 
 type Props<T extends string> = {
   options: { key: T; label: string }[];
@@ -9,6 +9,7 @@ type Props<T extends string> = {
 };
 
 export function Segmented<T extends string>({ options, value, onChange }: Props<T>) {
+  const styles = useStyles();
   return (
     <View role="tablist" style={styles.track}>
       {options.map((o) => {
@@ -32,12 +33,12 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   track: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 3 },
   // Sized by content first, so a long label gets more room than a short one.
   item: { flexGrow: 1, minHeight: 36, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
-  active: { backgroundColor: colors.bg, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' },
+  active: { backgroundColor: colors.raised, boxShadow: '0 1px 3px rgba(0,0,0,0.12)' },
   pressed: { opacity: 0.65 },
   text: { fontSize: 13, fontWeight: '600', color: colors.muted },
   textActive: { color: colors.text },
-});
+}));

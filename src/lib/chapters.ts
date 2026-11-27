@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Chapter, TranscriptSegment } from './types';
 
 const TS = /(?:^|[\s(\[])((?:\d{1,2}:)?\d{1,2}:\d{2})(?=$|[\s)\]\-–—:.,|])/;
@@ -22,7 +23,7 @@ export function parseChapters(description: string, durationSec?: number): Chapte
       .replace(/^[\s\-–—:.|)\]•·]+/, '')
       .replace(/[\s\-–—:|(\[]+$/, '')
       .trim();
-    raw.push({ start, title: title || `Глава ${raw.length + 1}` });
+    raw.push({ start, title: title || t().chapters.chapter(raw.length + 1) });
   }
   // Take the first ascending run that starts at 0:00 (or the longest ascending run).
   let best: typeof raw = [];
@@ -49,7 +50,7 @@ export function autoParts(durationSec: number, partMin = 10): Chapter[] {
   const len = durationSec / n;
   return Array.from({ length: n }, (_, i) => ({
     index: i,
-    title: n === 1 ? 'Всё видео' : `Часть ${i + 1}`,
+    title: n === 1 ? t().chapters.wholeVideo : t().chapters.part(i + 1),
     start: Math.round(i * len),
     end: i === n - 1 ? durationSec : Math.round((i + 1) * len),
   }));

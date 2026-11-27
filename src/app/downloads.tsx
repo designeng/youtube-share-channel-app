@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, type } from '../components/theme';
+import { FlatList, Pressable, Text, View } from 'react-native';
+import { radius, space, themed, useColors, useType } from '../components/theme';
 import { Thumbnail } from '../components/Thumbnail';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
@@ -10,6 +10,7 @@ import { StateView } from '../components/ui/StateView';
 import { downloadStatus } from '../components/video/DownloadBar';
 import { confirm } from '../lib/confirm';
 import { formatBytes } from '../lib/format';
+import { useStrings } from '../lib/i18n';
 import {
   cancelDownload,
   deleteAllDownloads,
@@ -24,23 +25,32 @@ import type { DownloadRecord } from '../lib/offline/types';
 const openVideo = (id: string, title: string) => router.push({ pathname: '/video/[id]', params: { id, title } });
 
 export default function DownloadsScreen() {
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
+  const s = useStrings();
   const records = useDownloadList();
   const active = Object.values(useActiveDownloads());
   const insets = useScreenInsets();
   const total = records.reduce((sum, r) => sum + r.bytes, 0);
   const free = freeSpace();
-  const freeText = free < Number.MAX_SAFE_INTEGER ? `свободно ${formatBytes(free)}` : '';
+  const freeText = free < Number.MAX_SAFE_INTEGER ? s.downloads.free(formatBytes(free)) : '';
 
   const askDelete = async (r: DownloadRecord) => {
-    const ok = await confirm({ title: 'Удалить скачанное?', message: r.video.title, confirmLabel: 'Удалить', destructive: true });
+    const ok = await confirm({
+      title: s.downloads.deleteTitle,
+      message: r.video.title,
+      confirmLabel: s.common.delete,
+      destructive: true,
+    });
     if (ok) deleteDownload(r.video.id);
   };
 
   const askDeleteAll = async () => {
     const ok = await confirm({
-      title: 'Удалить все скачанные?',
-      message: `Видео: ${records.length}, освободится ${formatBytes(total)}.`,
-      confirmLabel: 'Удалить все',
+      title: s.downloads.deleteAllTitle,
+      message: s.downloads.deleteAllMessage(records.length, formatBytes(total)),
+      confirmLabel: s.downloads.deleteAll,
       destructive: true,
     });
     if (ok) deleteAllDownloads();
@@ -56,9 +66,9 @@ export default function DownloadsScreen() {
           {records.length > 0 && (
             <View style={styles.summary}>
               <Text testID="downloads-summary" style={[type.caption, styles.fill]}>
-                {[`Видео: ${records.length}`, formatBytes(total), freeText].filter(Boolean).join(' · ')}
+                {[s.downloads.count(records.length), formatBytes(total), freeText].filter(Boolean).join(' · ')}
               </Text>
-              <Button small variant="danger" testID="delete-all" label="Удалить все" onPress={askDeleteAll} />
+              <Button small variant="danger" testID="delete-all" label={s.downloads.deleteAll} onPress={askDeleteAll} />
             </View>
           )}
           {active.map((d) => (
@@ -73,7 +83,7 @@ export default function DownloadsScreen() {
                 <Button
                   small
                   variant="ghost"
-                  label={d.phase === 'error' ? 'Закрыть' : 'Отмена'}
+                  label={d.phase === 'error' ? s.common.close : s.common.cancel}
                   onPress={() => cancelDownload(d.videoId)}
                 />
               </View>
@@ -87,15 +97,15 @@ export default function DownloadsScreen() {
           <StateView
             testID="downloads-summary"
             icon="download"
-            title="Пока ничего не скачано"
+            title={s.downloads.emptyTitle}
             message={[
-              'Откройте видео и нажмите «Скачать», чтобы смотреть его без интернета вместе с таймкодами и субтитрами.',
-              freeText && `Сейчас ${freeText}.`,
+              s.downloads.emptyMessage,
+              freeText && s.downloads.freeNow(freeText),
             ]
               .filter(Boolean)
               .join('\n')}
           >
-            <Button variant="secondary" label="К каналам" onPress={() => router.dismissTo('/')} />
+            <Button variant="secondary" label={s.downloads.toChannels} onPress={() => router.dismissTo('/')} />
           </StateView>
         )
       }
@@ -118,20 +128,20 @@ export default function DownloadsScreen() {
                 {[
                   formatBytes(r.bytes),
                   r.transcripts.length
-                    ? `субтитры: ${[...new Set(r.transcripts.map(transcriptLangOf))].join(', ')}`
-                    : 'без субтитров',
+                    ? s.downloads.subtitles([...new Set(r.transcripts.map(transcriptLangOf))].join(', '))
+                    : s.downloads.noSubtitles,
                 ].join(' · ')}
               </Text>
             </View>
           </Pressable>
-          <IconButton icon="trash" size={20} color={colors.muted} label="Удалить" onPress={() => askDelete(r)} />
+          <IconButton icon="trash" size={20} color={colors.muted} label={s.common.delete} onPress={() => askDelete(r)} />
         </View>
       )}
     />
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   fill: { flex: 1 },
   summary: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm },
   active: {
@@ -147,4 +157,4 @@ const styles = StyleSheet.create({
   main: { flex: 1, flexDirection: 'row', gap: space.md, paddingLeft: space.lg, paddingRight: space.xs, paddingVertical: space.sm },
   pressed: { backgroundColor: colors.surface },
   meta: { flex: 1, gap: 3 },
-});
+}));

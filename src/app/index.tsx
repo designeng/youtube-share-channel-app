@@ -2,8 +2,8 @@ import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, TOUCH, type } from '../components/theme';
+import { FlatList, Pressable, Text, View } from 'react-native';
+import { radius, space, themed, TOUCH, useColors, useType } from '../components/theme';
 import { Banner } from '../components/ui/Banner';
 import { Button } from '../components/ui/Button';
 import { Icon } from '../components/ui/Icon';
@@ -11,22 +11,22 @@ import { IconButton } from '../components/ui/IconButton';
 import { Input } from '../components/ui/Input';
 import { useScreenInsets } from '../components/ui/layout';
 import { confirm } from '../lib/confirm';
+import { useStrings } from '../lib/i18n';
 import { parseChannelRef } from '../lib/parseUrl';
 import { getRecentChannels, removeRecentChannel, useSettings, type RecentChannel } from '../lib/settings';
-
-const STEPS = [
-  'Откройте канал или видео в приложении YouTube',
-  'Нажмите «Поделиться»',
-  'Выберите Channel Viewer — или скопируйте ссылку и вставьте её выше',
-];
 
 export default function Home() {
   const { settings, loaded } = useSettings();
   const insets = useScreenInsets();
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
+  const s = useStrings();
   /** undefined until read from storage, so the first-run help does not flash */
   const [recent, setRecent] = useState<RecentChannel[]>();
   const [input, setInput] = useState('');
-  const [inputError, setInputError] = useState<string>();
+  /** which message to show, so it follows a language change */
+  const [inputError, setInputError] = useState<'notALink' | 'emptyClipboard'>();
   const [onlyVideo, setOnlyVideo] = useState(false);
   const isVideo = parseChannelRef(input)?.kind === 'video';
 
@@ -45,7 +45,7 @@ export default function Home() {
     if (!text.trim()) return;
     const ref = parseChannelRef(text);
     // Say what is wrong right here instead of opening a screen only to fail.
-    if (!ref) return setInputError('Это не похоже на ссылку на YouTube-канал или видео.');
+    if (!ref) return setInputError('notALink');
     router.push({
       pathname: '/open',
       params: { input: text.trim(), ...(ref.kind === 'video' ? { mode: video ? 'video' : 'channel' } : {}) },
@@ -54,13 +54,13 @@ export default function Home() {
 
   const paste = async () => {
     const t = await Clipboard.getStringAsync();
-    if (!t.trim()) return setInputError('В буфере обмена пусто. Скопируйте ссылку в YouTube.');
+    if (!t.trim()) return setInputError('emptyClipboard');
     changeInput(t);
     if (parseChannelRef(t)?.kind !== 'video') open(t);
   };
 
   const askRemove = async (c: RecentChannel) => {
-    const ok = await confirm({ title: 'Убрать из недавних?', message: c.title, confirmLabel: 'Убрать', destructive: true });
+    const ok = await confirm({ title: s.home.removeTitle, message: c.title, confirmLabel: s.home.remove, destructive: true });
     if (!ok) return;
     await removeRecentChannel(c.id);
     setRecent(await getRecentChannels());
@@ -71,8 +71,8 @@ export default function Home() {
       {loaded && !settings.youtubeKey && (
         <Banner
           tone="warn"
-          text="Чтобы загружать видео канала, нужен бесплатный YouTube Data API key."
-          actionLabel="Указать в настройках"
+          text={s.home.needKey}
+          actionLabel={s.home.setInSettings}
           onAction={() => router.push('/settings')}
         />
       )}
@@ -83,14 +83,14 @@ export default function Home() {
         onClear={() => changeInput('')}
         invalid={!!inputError}
         placeholder="youtube.com/@handle"
-        aria-label="Ссылка на канал или видео"
+        aria-label={s.home.linkLabel}
         keyboardType="url"
         returnKeyType="go"
         onSubmitEditing={() => open(input)}
       />
       {inputError && (
         <Text role="alert" style={[type.caption, styles.error]}>
-          {inputError}
+          {s.home[inputError]}
         </Text>
       )}
       {isVideo && (
@@ -102,19 +102,19 @@ export default function Home() {
         >
           <Icon name={onlyVideo ? 'checkboxOn' : 'checkboxOff'} size={24} color={onlyVideo ? colors.primary : colors.muted} />
           <View style={styles.fill}>
-            <Text style={type.label}>Открыть только это видео</Text>
-            <Text style={type.micro}>Иначе откроется весь канал</Text>
+            <Text style={type.label}>{s.home.onlyVideo}</Text>
+            <Text style={type.micro}>{s.home.onlyVideoHint}</Text>
           </View>
         </Pressable>
       )}
       {input ? (
-        <Button label="Открыть" onPress={() => open(input)} />
+        <Button label={s.home.open} onPress={() => open(input)} />
       ) : (
-        <Button label="Вставить из буфера" icon="paste" onPress={paste} />
+        <Button label={s.home.paste} icon="paste" onPress={paste} />
       )}
       {!!recent?.length && (
         <Text role="heading" style={[type.heading, styles.section]}>
-          Недавние
+          {s.home.recent}
         </Text>
       )}
     </View>
@@ -126,8 +126,8 @@ export default function Home() {
         options={{
           headerRight: () => (
             <View style={styles.headerButtons}>
-              <IconButton testID="open-downloads" icon="download" label="Скачанные" onPress={() => router.push('/downloads')} />
-              <IconButton icon="settings" label="Настройки" onPress={() => router.push('/settings')} />
+              <IconButton testID="open-downloads" icon="download" label={s.nav.downloads} onPress={() => router.push('/downloads')} />
+              <IconButton icon="settings" label={s.nav.settings} onPress={() => router.push('/settings')} />
             </View>
           ),
         }}
@@ -143,9 +143,9 @@ export default function Home() {
           recent ? (
             <View style={styles.help}>
               <Text role="heading" style={type.heading}>
-                Как открыть канал
+                {s.home.howTo}
               </Text>
-              {STEPS.map((step, i) => (
+              {s.home.steps.map((step, i) => (
                 <View key={step} style={styles.step}>
                   <View style={styles.stepNumber}>
                     <Text style={type.label}>{i + 1}</Text>
@@ -180,7 +180,7 @@ export default function Home() {
               icon="close"
               size={18}
               color={colors.muted}
-              label={`Убрать из недавних: ${item.title}`}
+              label={s.home.removeRecent(item.title)}
               onPress={() => askRemove(item)}
             />
           </View>
@@ -190,7 +190,7 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   fill: { flex: 1 },
   headerButtons: { flexDirection: 'row', gap: space.xs },
   top: { paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md },
@@ -212,4 +212,4 @@ const styles = StyleSheet.create({
   help: { margin: space.lg, marginTop: space.xl, padding: space.lg, gap: space.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   step: { flexDirection: 'row', gap: space.md },
   stepNumber: { width: 26, height: 26, borderRadius: radius.pill, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-});
+}));

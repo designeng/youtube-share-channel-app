@@ -1,13 +1,14 @@
 import { Image, type ImageProps } from 'expo-image';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { formatTime } from '../lib/format';
-import { colors, radius } from './theme';
+import { radius, themed } from './theme';
 
 type Props = { source: ImageProps['source']; durationSec?: number; recyclingKey?: string };
 
 /** 16:9 preview that scales with the screen, with the duration in the corner. */
 export function Thumbnail({ source, durationSec, recyclingKey }: Props) {
   const { width } = useWindowDimensions();
+  const styles = useStyles();
   return (
     <View style={[styles.wrap, { width: Math.round(Math.min(168, width * 0.38)) }]}>
       <Image source={source} style={styles.image} contentFit="cover" transition={150} recyclingKey={recyclingKey} />
@@ -20,7 +21,7 @@ export function Thumbnail({ source, durationSec, recyclingKey }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   wrap: { aspectRatio: 16 / 9, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.surface },
   image: { width: '100%', height: '100%' },
   badge: {
@@ -33,4 +34,4 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
-});
+}));

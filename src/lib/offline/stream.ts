@@ -3,6 +3,7 @@
  * same caveats apply (see transcript.ts). Only "progressive" formats hold video and sound in one file;
  * YouTube offers them up to 360p. Better quality comes as separate tracks that would need muxing.
  */
+import { getLanguage, t } from '../i18n';
 import { ANDROID_UA, androidPlayer } from '../transcript';
 
 export type VideoStream = {
@@ -14,14 +15,14 @@ export type VideoStream = {
 };
 
 export async function getVideoStream(videoId: string): Promise<VideoStream> {
-  const json = await androidPlayer(videoId, 'en');
+  const json = await androidPlayer(videoId, getLanguage());
   const formats: any[] = json?.streamingData?.formats ?? [];
   const best = formats
     .filter((f) => f.url && f.mimeType?.startsWith('video/mp4'))
     .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0];
   if (!best) {
     const reason = json?.playabilityStatus?.reason;
-    throw new Error(reason ? `YouTube не отдаёт это видео: ${reason}` : 'Нет файла для скачивания (трансляция или изменился API YouTube).');
+    throw new Error(reason ? t().download.refused(reason) : t().download.noFile);
   }
   const estimate = (Number(best.bitrate) / 8) * (Number(best.approxDurationMs) / 1000);
   return {

@@ -1,7 +1,7 @@
 /** Empty, loading and error states: what happened and what can be done about it. */
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, type } from '../theme';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { radius, space, themed, useColors, useType } from '../theme';
 import { Icon, type IconName } from './Icon';
 
 type Props = {
@@ -16,6 +16,9 @@ type Props = {
 };
 
 export function StateView({ icon, tone = 'neutral', loading, title, message, children, testID }: Props) {
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
   const error = tone === 'error';
   return (
     <View testID={testID} role={error ? 'alert' : undefined} style={styles.wrap}>
@@ -33,7 +36,7 @@ export function StateView({ icon, tone = 'neutral', loading, title, message, chi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   wrap: { alignItems: 'center', paddingHorizontal: space.xl, paddingVertical: space.xxl, gap: space.sm },
   icon: {
     width: 64,
@@ -47,4 +50,4 @@ const styles = StyleSheet.create({
   iconError: { backgroundColor: colors.accentSoft },
   center: { textAlign: 'center' },
   actions: { alignSelf: 'stretch', alignItems: 'stretch', gap: space.sm, marginTop: space.md, maxWidth: 360, width: '100%', marginHorizontal: 'auto' },
-});
+}));

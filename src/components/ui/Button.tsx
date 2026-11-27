@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, radius, space, TOUCH } from '../theme';
+import { radius, space, TOUCH, useColors } from '../theme';
 import { Icon, type IconName } from './Icon';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -17,15 +17,14 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-const TONE: Record<Variant, { bg: string; fg: string }> = {
-  primary: { bg: colors.primary, fg: colors.onPrimary },
-  secondary: { bg: colors.surface, fg: colors.text },
-  ghost: { bg: 'transparent', fg: colors.link },
-  danger: { bg: 'transparent', fg: colors.danger },
-};
-
 export function Button({ label, onPress, variant = 'primary', small, icon, loading, disabled, testID, style }: Props) {
-  const { bg, fg } = TONE[variant];
+  const colors = useColors();
+  const { bg, fg } = {
+    primary: { bg: colors.primary, fg: colors.onPrimary },
+    secondary: { bg: colors.surface, fg: colors.text },
+    ghost: { bg: 'transparent', fg: colors.link },
+    danger: { bg: 'transparent', fg: colors.danger },
+  }[variant];
   const flat = variant === 'ghost' || variant === 'danger';
   return (
     <Pressable

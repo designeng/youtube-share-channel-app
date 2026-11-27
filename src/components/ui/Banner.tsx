@@ -1,16 +1,10 @@
 /** Inline notice above the content it is about. */
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space } from '../theme';
+import { radius, space, useColors } from '../theme';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
 
 type Tone = 'info' | 'warn' | 'error';
-
-const TONE: Record<Tone, { bg: string; fg: string; icon: IconName }> = {
-  info: { bg: colors.surface, fg: colors.muted, icon: 'info' },
-  warn: { bg: colors.warnBg, fg: colors.warnText, icon: 'alert' },
-  error: { bg: colors.accentSoft, fg: colors.danger, icon: 'alert' },
-};
 
 type Props = {
   tone?: Tone;
@@ -20,7 +14,14 @@ type Props = {
 };
 
 export function Banner({ tone = 'info', text, actionLabel, onAction }: Props) {
-  const { bg, fg, icon } = TONE[tone];
+  const colors = useColors();
+  const { bg, fg, icon } = (
+    {
+      info: { bg: colors.surface, fg: colors.muted, icon: 'info' },
+      warn: { bg: colors.warnBg, fg: colors.warnText, icon: 'alert' },
+      error: { bg: colors.accentSoft, fg: colors.danger, icon: 'alert' },
+    } satisfies Record<Tone, { bg: string; fg: string; icon: IconName }>
+  )[tone];
   return (
     <View role={tone === 'error' ? 'alert' : undefined} style={[styles.banner, { backgroundColor: bg }]}>
       <Icon name={icon} size={18} color={fg} />

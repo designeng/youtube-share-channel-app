@@ -11,6 +11,7 @@
  *   2. Watch page HTML -> ytInitialPlayerResponse -> same timedtext URLs.
  *   3. /youtubei/v1/get_transcript (the "Show transcript" panel) – default track only.
  */
+import { t } from './i18n';
 import type { CaptionTrack, Transcript, TranscriptInfo, TranscriptSegment } from './types';
 
 const YT = 'https://www.youtube.com';
@@ -272,8 +273,8 @@ export async function getTranscript(
     return { languageCode: track?.languageCode ?? 'und', isAuto: track?.isAuto ?? false, segments, source: 'get_transcript' };
   throw new Error(
     info.tracks.length
-      ? 'YouTube отказал в выдаче субтитров (возможно, изменился внутренний API).'
-      : 'У этого видео нет субтитров.',
+      ? t().transcript.refused
+      : t().video.noSubtitles,
   );
 }
 

@@ -19,6 +19,7 @@ import { YouTubePlayer } from '../../components/YouTubePlayer';
 import { generateReview } from '../../lib/ai';
 import { videoParts } from '../../lib/chapters';
 import { errorText } from '../../lib/format';
+import { t, useStrings } from '../../lib/i18n';
 import { deleteDownload, readSavedReviews, saveReviews, useDownload } from '../../lib/offline/manager';
 import { videoUri } from '../../lib/offline/store';
 import { transcriptLangOf } from '../../lib/offline/transcripts';
@@ -32,10 +33,10 @@ const base = (c?: string) => (c ?? '').toLowerCase().split('-')[0];
 const choiceOf = (t: Transcript): TrackChoice => ({ languageCode: t.languageCode, tlang: t.translatedTo });
 const sameChoice = (t: Transcript, c?: TrackChoice) => t.languageCode === c?.languageCode && t.translatedTo === c.tlang;
 
-function savedLabel(t: Transcript) {
-  if (t.translatedTo) return `Перевод → ${t.translatedTo}`;
-  const name = { ru: 'Русский', en: 'English' }[transcriptLangOf(t)] ?? t.languageCode;
-  return t.isAuto ? `${name} (авто)` : name;
+function savedLabel(transcript: Transcript) {
+  if (transcript.translatedTo) return t().video.translation(transcript.translatedTo);
+  const name = { ru: 'Русский', en: 'English' }[transcriptLangOf(transcript)] ?? transcript.languageCode;
+  return transcript.isAuto ? `${name} (${t().video.auto})` : name;
 }
 
 export default function VideoScreen() {
@@ -43,6 +44,7 @@ export default function VideoScreen() {
   const { settings, loaded } = useSettings();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const s = useStrings();
   const player = useRef<PlayerHandle>(null);
 
   // A downloaded copy gives the video details, timecodes, transcripts and the file itself without a network.
@@ -94,7 +96,7 @@ export default function VideoScreen() {
     getTranscriptInfo(id, settings.transcriptLang)
       .then((i) => {
         setInfo(i);
-        if (!i.tracks.length) return setTrError('У этого видео нет субтитров.');
+        if (!i.tracks.length) return setTrError(t().video.noSubtitles);
         const p = pickTrack(i, settings.transcriptLang);
         selectChoice({ languageCode: p.track.languageCode, tlang: p.tlang });
       })
@@ -115,7 +117,9 @@ export default function VideoScreen() {
 
   const { authored: hasChapters, parts } = useMemo(
     () => (video ? videoParts(video) : { authored: false, parts: [] as Chapter[] }),
-    [video],
+    // Generated part titles are in the UI language.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [video, s],
   );
 
   // Restore reviews: kept with the download, else still in the cache.
@@ -167,10 +171,10 @@ export default function VideoScreen() {
       const k = String(target);
       if (reviews[k]?.loading) return;
       if (!force && reviews[k]?.text) return patchReview(k, { open: !reviews[k].open });
-      patchReview(k, { loading: true, error: undefined, status: 'Получаю транскрипт…', open: true });
+      patchReview(k, { loading: true, error: undefined, status: t().video.gettingTranscript, open: true });
       try {
         const tr = await getAiTranscript();
-        patchReview(k, { status: tr ? 'Генерирую обзор…' : 'Субтитров нет — Gemini смотрит видео…' });
+        patchReview(k, { status: tr ? t().video.generating : t().video.watching });
         const text = await generateReview({ video, chapters: parts, transcript: tr, target }, settings, (status) =>
           patchReview(k, { status }),
         );
@@ -230,17 +234,17 @@ export default function VideoScreen() {
 
   const trackOptions: TrackOption[] = useMemo(() => {
     if (!info) return [];
-    const opts: TrackOption[] = info.tracks.map((t) => ({
-      label: `${t.name}${t.isAuto && !/auto|авто/i.test(t.name) ? ' (авто)' : ''}`,
-      choice: { languageCode: t.languageCode },
+    const opts: TrackOption[] = info.tracks.map((track) => ({
+      label: `${track.name}${track.isAuto && !/auto|авто/i.test(track.name) ? ` (${s.video.auto})` : ''}`,
+      choice: { languageCode: track.languageCode },
     }));
     const want = settings.transcriptLang;
     const hasExact = info.tracks.some((t) => base(t.languageCode) === base(want));
     const src = info.tracks.find((t) => !t.isAuto && t.isTranslatable) ?? info.tracks.find((t) => t.isTranslatable);
     if (!hasExact && src && info.translationLanguages.some((l) => base(l.languageCode) === base(want)))
-      opts.unshift({ label: `Перевод → ${want}`, choice: { languageCode: src.languageCode, tlang: want } });
+      opts.unshift({ label: s.video.translation(want), choice: { languageCode: src.languageCode, tlang: want } });
     return opts;
-  }, [info, settings.transcriptLang]);
+  }, [info, settings.transcriptLang, s]);
 
   const retryVideo = () => {
     setError(undefined);
@@ -281,7 +285,7 @@ export default function VideoScreen() {
       ]}
     >
       <Stack.Screen options={{ title: video?.title ?? title ?? '', headerShown: !fullscreen }} />
-      <StatusBar hidden={fullscreen} style="dark" />
+      <StatusBar hidden={fullscreen} style="auto" />
       {playLocal ? (
         <LocalPlayer
           ref={player}
@@ -296,7 +300,7 @@ export default function VideoScreen() {
       )}
       {playLocal && fileError && (
         <View style={styles.banner}>
-          <Banner tone="error" text="Не удалось воспроизвести файл. Удалите его и скачайте заново." />
+          <Banner tone="error" text={s.video.fileError} />
         </View>
       )}
       {!playLocal && playerError != null && (
@@ -304,7 +308,7 @@ export default function VideoScreen() {
           <Banner
             tone="warn"
             text={playerErrorText(playerError)}
-            actionLabel="Открыть в YouTube"
+            actionLabel={s.video.openInYouTube}
             onAction={() => Linking.openURL(`https://www.youtube.com/watch?v=${id}&t=${Math.floor(time)}s`)}
           />
         </View>
@@ -337,15 +341,15 @@ export default function VideoScreen() {
             />
           ) : error && !video ? (
             <ScrollView>
-              <StateView icon="alert" tone="error" title="Не удалось загрузить видео" message={errorText(error)}>
+              <StateView icon="alert" tone="error" title={s.video.loadFailed} message={errorText(error)}>
                 {/key|ключ/i.test(error) && (
-                  <Button icon="settings" label="Открыть настройки" onPress={() => router.push('/settings')} />
+                  <Button icon="settings" label={s.common.openSettings} onPress={() => router.push('/settings')} />
                 )}
-                <Button variant="secondary" icon="refresh" label="Повторить" onPress={retryVideo} />
+                <Button variant="secondary" icon="refresh" label={s.common.retry} onPress={retryVideo} />
               </StateView>
             </ScrollView>
           ) : !video ? (
-            <StateView loading message="Загружаю видео…" />
+            <StateView loading message={s.video.loading} />
           ) : mode === 'chapters' ? (
             <ChaptersPanel
               chapters={parts}
