@@ -17,6 +17,12 @@ export function formatTime(totalSec: number): string {
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
+export function formatBytes(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1).replace('.', ',')} ГБ`;
+  if (n >= 1e6) return `${Math.round(n / 1e6)} МБ`;
+  return `${Math.max(1, Math.round(n / 1e3))} КБ`;
+}
+
 export function formatDate(iso: string, locale = 'ru-RU'): string {
   try {
     return new Date(iso).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });

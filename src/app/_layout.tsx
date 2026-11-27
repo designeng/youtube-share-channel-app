@@ -35,6 +35,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ title: 'Настройки', presentation: 'modal' }} />
           <Stack.Screen name="channel/[id]" options={{ title: '' }} />
           <Stack.Screen name="video/[id]" options={{ title: '' }} />
+          <Stack.Screen name="downloads" options={{ title: 'Скачанные' }} />
         </Stack>
       </SettingsProvider>
     </ShareIntentProvider>

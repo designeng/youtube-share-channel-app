@@ -39,7 +39,8 @@
             "text/*"
           ]
         }
-      ]
+      ],
+      "expo-video"
     ],
     "scheme": "channelviewer",
     "experiments": {

@@ -23,7 +23,7 @@ const ANDROID_CLIENT = {
   osName: 'Android',
   osVersion: '11',
 };
-const ANDROID_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip';
+export const ANDROID_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip';
 const WEB_CLIENT = { clientName: 'WEB', clientVersion: '2.20251101.00.00' };
 const WEB_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
@@ -55,7 +55,8 @@ function toInfo(c: PlayerCaptions | undefined): TranscriptInfo {
   return { tracks, translationLanguages };
 }
 
-async function playerViaAndroid(videoId: string, hl: string): Promise<PlayerCaptions | undefined> {
+/** Raw InnerTube player response as the Android app gets it: caption tracks and stream URLs. */
+export async function androidPlayer(videoId: string, hl: string): Promise<any | undefined> {
   const res = await fetch(`${YT}/youtubei/v1/player?prettyPrint=false`, {
     method: 'POST',
     headers: {
@@ -71,9 +72,7 @@ async function playerViaAndroid(videoId: string, hl: string): Promise<PlayerCapt
       racyCheckOk: true,
     }),
   });
-  if (!res.ok) return undefined;
-  const json = await res.json();
-  return json?.captions?.playerCaptionsTracklistRenderer;
+  return res.ok ? res.json() : undefined;
 }
 
 async function fetchWatchHtml(videoId: string, hl: string): Promise<string> {
@@ -116,7 +115,7 @@ function extractJsonAfter(html: string, marker: string): any | undefined {
   return undefined;
 }
 
-let cache = new Map<string, { info: TranscriptInfo; html?: string }>();
+const cache = new Map<string, { info: TranscriptInfo; html?: string }>();
 
 /** Lists available caption tracks + languages YouTube can auto-translate into. */
 export async function getTranscriptInfo(videoId: string, hl = 'en'): Promise<TranscriptInfo> {
@@ -125,7 +124,7 @@ export async function getTranscriptInfo(videoId: string, hl = 'en'): Promise<Tra
 
   let info: TranscriptInfo = { tracks: [], translationLanguages: [] };
   try {
-    info = toInfo(await playerViaAndroid(videoId, hl));
+    info = toInfo((await androidPlayer(videoId, hl))?.captions?.playerCaptionsTracklistRenderer);
   } catch {}
   let html: string | undefined;
   if (!info.tracks.length) {
@@ -135,7 +134,8 @@ export async function getTranscriptInfo(videoId: string, hl = 'en'): Promise<Tra
       info = toInfo(pr?.captions?.playerCaptionsTracklistRenderer);
     } catch {}
   }
-  cache.set(videoId, { info, html });
+  // An empty result may just mean there was no network: ask again next time.
+  if (info.tracks.length) cache.set(videoId, { info, html });
   return info;
 }
 
@@ -277,6 +277,19 @@ export async function getTranscript(
   );
 }
 
-export function clearTranscriptCache() {
-  cache = new Map();
+/** Drops the cached track list: its URLs expire after a few hours. */
+export function forgetTranscriptInfo(videoId: string) {
+  cache.delete(videoId);
+}
+
+const baseLang = (c?: string) => (c ?? '').toLowerCase().split('-')[0];
+
+/** Best transcript for the AI: original language (more accurate than YouTube's machine translation). */
+export function originalTrack(info: TranscriptInfo, audioLang?: string) {
+  const a = baseLang(audioLang);
+  return (
+    info.tracks.find((t) => !t.isAuto && a && baseLang(t.languageCode) === a) ??
+    info.tracks.find((t) => t.isAuto) ??
+    info.tracks.find((t) => !t.isAuto)
+  );
 }

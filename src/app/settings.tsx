@@ -7,12 +7,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../components/theme';
+import { OFFLINE_LANGS } from '../lib/offline/types';
 import { listGeminiModels, listOpenRouterFreeModels, type AiProvider, type ModelOption } from '../lib/ai';
 import { useSettings, type Settings } from '../lib/settings';
 
@@ -101,6 +103,42 @@ export default function SettingsScreen() {
         help="Код языка (ru, en, de…). Если такой дорожки нет — используется автоперевод YouTube."
       />
 
+      <Text style={styles.section}>Скачивание</Text>
+      <View style={styles.switchRow}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={styles.label}>Только по Wi-Fi</Text>
+          <Text style={styles.help}>
+            Без Wi-Fi приложение предупредит о расходе трафика и спросит разрешения. Если Wi-Fi пропадёт во время
+            загрузки, она остановится.
+          </Text>
+        </View>
+        <Switch testID="wifi-only" value={draft.wifiOnly} onValueChange={(wifiOnly) => set({ wifiOnly })} />
+      </View>
+      <View style={styles.field}>
+        <Text style={styles.label}>Субтитры для офлайна</Text>
+        <View style={styles.segment}>
+          {OFFLINE_LANGS.map((l) => {
+            const on = draft.offlineLangs.includes(l.code);
+            return (
+              <Pressable
+                key={l.code}
+                role="checkbox"
+                aria-checked={on}
+                style={[styles.segItem, on && styles.segActive]}
+                onPress={() =>
+                  set({
+                    offlineLangs: on ? draft.offlineLangs.filter((c) => c !== l.code) : [...draft.offlineLangs, l.code],
+                  })
+                }
+              >
+                <Text style={[styles.segText, on && { color: '#fff' }]}>{l.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.help}>Сохраняются вместе с видео, плюс дорожка на языке оригинала.</Text>
+      </View>
+
       <Text style={styles.section}>AI-обзоры</Text>
       <View style={styles.segment}>
         {(['gemini', 'openrouter'] as AiProvider[]).map((p) => (
@@ -176,7 +214,7 @@ export default function SettingsScreen() {
           set({ cacheTtlMin: Number.isFinite(n) ? n : 0 });
         }}
         placeholder="60"
-        help="Сколько хранить готовый обзор фрагмента видео, чтобы не запрашивать AI повторно. По умолчанию 60 (1 час), 0 — не кешировать. «Перегенерировать» всегда обновляет кеш."
+        help="Сколько хранить готовый обзор фрагмента видео, чтобы не запрашивать AI повторно. По умолчанию 60 (1 час), 0 — не кешировать. «Перегенерировать» всегда обновляет кеш. Обзоры скачанных видео хранятся вместе с файлом и не устаревают."
       />
 
       <Modal visible={!!models} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={() => setModels(undefined)}>
@@ -214,6 +252,7 @@ const styles = StyleSheet.create({
   body: { padding: 16, gap: 12, paddingBottom: 48 },
   section: { fontSize: 18, fontWeight: '700', color: colors.text, marginTop: 8 },
   field: { gap: 6 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   label: { fontWeight: '600', color: colors.text },
   input: {
     borderWidth: 1,

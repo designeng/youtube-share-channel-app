@@ -55,6 +55,13 @@ export function autoParts(durationSec: number, partMin = 10): Chapter[] {
   }));
 }
 
+/** What the video screen shows and AI reviews are made for: the author's chapters, else equal parts. */
+export function videoParts({ description, durationSec }: { description: string; durationSec?: number }) {
+  const chapters = parseChapters(description, durationSec);
+  const authored = chapters.length > 0;
+  return { authored, parts: authored ? chapters : durationSec ? autoParts(durationSec) : [] };
+}
+
 export function segmentsFor(segments: TranscriptSegment[], ch: Chapter): TranscriptSegment[] {
   return segments.filter((s) => s.start >= ch.start - 0.5 && s.start < ch.end);
 }

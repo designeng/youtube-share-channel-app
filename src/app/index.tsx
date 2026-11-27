@@ -39,9 +39,14 @@ export default function Home() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
-              <Text style={{ fontSize: 22 }}>⚙︎</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 18 }}>
+              <Pressable testID="open-downloads" aria-label="Скачанные" onPress={() => router.push('/downloads')} hitSlop={10}>
+                <Text style={{ fontSize: 22 }}>⬇︎</Text>
+              </Pressable>
+              <Pressable aria-label="Настройки" onPress={() => router.push('/settings')} hitSlop={10}>
+                <Text style={{ fontSize: 22 }}>⚙︎</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
