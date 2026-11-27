@@ -212,6 +212,40 @@ test.describe('AI review', () => {
     await expect(page.getByText('Общий обзор видео')).toBeVisible();
   });
 
+  test('keeps its place while another mode is open', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 480 });
+    await openVideo(page);
+    await page.getByTestId('mode-ai').click();
+    await page.getByTestId('ai-run-all').click();
+    await expect(page.getByText(`Обзор главы «${CHAPTERS[2]}»`)).toBeAttached();
+
+    const list = page.getByTestId('ai-list');
+    await list.hover();
+    await page.mouse.wheel(0, 300);
+    await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    const offset = await list.evaluate((el) => el.scrollTop);
+
+    await page.getByTestId('mode-transcript').click();
+    await expect(page.getByTestId('panel-ai')).toBeHidden();
+    await page.getByTestId('mode-ai').click();
+    expect(await list.evaluate((el) => el.scrollTop)).toBe(offset);
+  });
+
+  test('"AI" on a timecode brings that chapter into view in an already opened review', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 480 });
+    await openVideo(page);
+    await page.getByTestId('mode-ai').click();
+    await page.getByTestId('ai-run-all').click();
+    await expect(page.getByText(`Обзор главы «${CHAPTERS[2]}»`)).toBeAttached();
+    await expect(page.getByTestId('ai-row-2')).not.toBeInViewport();
+    await page.getByTestId('mode-chapters').click();
+    await page.getByTestId('chapter-ai-2').click();
+
+    // Not 1: the offset may be a pixel or two off.
+    await expect(page.getByTestId('ai-row-2')).toBeInViewport({ ratio: 0.9 });
+  });
+
   test('reviews all chapters one by one', async ({ page }) => {
     await openVideo(page);
     await page.getByTestId('mode-ai').click();
