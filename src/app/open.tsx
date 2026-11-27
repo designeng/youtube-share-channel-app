@@ -1,7 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../components/theme';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Button } from '../components/ui/Button';
+import { useScreenInsets } from '../components/ui/layout';
+import { StateView } from '../components/ui/StateView';
+import { errorText } from '../lib/format';
 import { parseChannelRef } from '../lib/parseUrl';
 import { addRecentChannel, useSettings } from '../lib/settings';
 import { resolveChannel } from '../lib/youtubeApi';
@@ -10,8 +13,10 @@ import { resolveChannel } from '../lib/youtubeApi';
 export default function OpenScreen() {
   const { input, mode } = useLocalSearchParams<{ input: string; mode?: 'video' | 'channel' }>();
   const { settings, loaded } = useSettings();
+  const insets = useScreenInsets();
   const ref = useMemo(() => parseChannelRef(String(input ?? '')), [input]);
   const [apiError, setError] = useState<string>();
+  const [attempt, setAttempt] = useState(0);
   const [choice, setChoice] = useState<'video' | 'channel' | undefined>(mode);
   const needChoice = ref?.kind === 'video' && !choice;
   const error = ref ? apiError : `Это не похоже на ссылку на YouTube-канал:\n${input}`;
@@ -33,39 +38,36 @@ export default function OpenScreen() {
     return () => {
       cancelled = true;
     };
-  }, [ref, loaded, settings.youtubeKey, needChoice, choice]);
+  }, [ref, loaded, settings.youtubeKey, needChoice, choice, attempt]);
+
+  const retry = () => {
+    setError(undefined);
+    setAttempt((n) => n + 1);
+  };
 
   return (
-    <View style={styles.c}>
+    <ScrollView contentContainerStyle={[styles.body, insets]}>
+      <Stack.Screen options={{ title: '' }} />
       {needChoice ? (
-        <>
-          <Text style={styles.err}>Это ссылка на видео</Text>
-          <Pressable style={styles.btn} onPress={() => setChoice('video')}>
-            <Text style={styles.btnText}>Открыть только видео</Text>
-          </Pressable>
-          <Pressable style={styles.btn} onPress={() => setChoice('channel')}>
-            <Text style={styles.btnText}>Открыть весь канал</Text>
-          </Pressable>
-        </>
+        <StateView icon="video" title="Это ссылка на видео" message="Что открыть?">
+          <Button icon="play" label="Открыть только видео" onPress={() => setChoice('video')} />
+          <Button variant="secondary" icon="channel" label="Открыть весь канал" onPress={() => setChoice('channel')} />
+        </StateView>
       ) : error ? (
-        <>
-          <Text style={styles.err}>{error}</Text>
+        <StateView icon="alert" tone="error" title="Не получилось открыть" message={errorText(error)}>
           {/key|ключ/i.test(error) && (
-            <Pressable style={styles.btn} onPress={() => router.push('/settings')}>
-              <Text style={styles.btnText}>Открыть настройки</Text>
-            </Pressable>
+            <Button icon="settings" label="Открыть настройки" onPress={() => router.push('/settings')} />
           )}
-        </>
+          {ref && <Button variant="secondary" icon="refresh" label="Повторить" onPress={retry} />}
+          <Button variant="ghost" label="На главную" onPress={() => router.dismissTo('/')} />
+        </StateView>
       ) : (
-        <ActivityIndicator size="large" />
+        <StateView loading message="Ищу канал…" />
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  c: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
-  err: { color: colors.accent, textAlign: 'center', fontSize: 15 },
-  btn: { backgroundColor: colors.chipActive, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: '600' },
+  body: { flexGrow: 1, justifyContent: 'center' },
 });

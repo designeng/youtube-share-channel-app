@@ -4,7 +4,6 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -15,9 +14,13 @@ import {
   type FlatListInstance,
 } from 'react-native';
 import { lineIndexAt, transcriptLines, type TranscriptLine } from '../../lib/chapters';
-import { formatTime } from '../../lib/format';
+import { errorText, formatTime } from '../../lib/format';
 import type { Transcript } from '../../lib/types';
-import { colors } from '../theme';
+import { colors, radius, space, TOUCH, type } from '../theme';
+import { Banner } from '../ui/Banner';
+import { Chip } from '../ui/Chip';
+import { Icon } from '../ui/Icon';
+import { StateView } from '../ui/StateView';
 import { shared } from './styles';
 
 export type TrackChoice = { languageCode: string; tlang?: string };
@@ -38,6 +41,8 @@ type Props = {
   time: number;
   onChoose: (c: TrackChoice) => void;
   onSeek: (sec: number) => void;
+  /** absent when trying again cannot help */
+  onRetry?: () => void;
 };
 
 const Line = memo(function Line({
@@ -57,15 +62,15 @@ const Line = memo(function Line({
       role="button"
       aria-selected={active}
       onPress={() => onPress(line)}
-      style={[styles.line, active && styles.lineActive]}
+      style={({ pressed }) => [styles.line, active && styles.lineActive, pressed && styles.pressed]}
     >
       <Text style={shared.time}>{formatTime(line.start)}</Text>
-      <Text style={styles.text}>{line.text}</Text>
+      <Text style={[type.body, styles.text]}>{line.text}</Text>
     </Pressable>
   );
 });
 
-export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek }: Props) {
+export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek, onRetry }: Props) {
   const list = useRef<FlatListInstance>(null);
   const [follow, setFollow] = useState(true);
   const following = useRef(follow);
@@ -117,25 +122,31 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
   return (
     <View testID="panel-transcript" style={styles.panel}>
       {options.length > 0 && (
-        <ScrollView horizontal style={styles.chipsRow} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {options.map((o) => {
-            const active = choice?.languageCode === o.choice.languageCode && choice?.tlang === o.choice.tlang;
-            return (
-              <Pressable key={o.label} onPress={() => onChoose(o.choice)} style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && { color: '#fff' }]}>{o.label}</Text>
-              </Pressable>
-            );
-          })}
+        <ScrollView horizontal style={styles.chipsRow} showsHorizontalScrollIndicator={false} contentContainerStyle={shared.chips}>
+          {options.map((o) => (
+            <Chip
+              key={o.label}
+              label={o.label}
+              active={choice?.languageCode === o.choice.languageCode && choice?.tlang === o.choice.tlang}
+              onPress={() => onChoose(o.choice)}
+            />
+          ))}
         </ScrollView>
       )}
       {transcript?.translationFailed && (
-        <Text style={[shared.hint, styles.notice]}>
-          YouTube ограничил автоперевод субтитров (лимит запросов) — показан оригинал. AI-обзор всё равно будет на
-          выбранном языке.
-        </Text>
+        <View style={styles.notice}>
+          <Banner
+            tone="warn"
+            text="YouTube ограничил автоперевод субтитров (лимит запросов) — показан оригинал. AI-обзор всё равно будет на выбранном языке."
+          />
+        </View>
       )}
-      {error && !loading && <Text style={[shared.hint, styles.notice]}>{error}</Text>}
-      {(loading || (!transcript && !error)) && <ActivityIndicator style={{ margin: 12 }} />}
+      {error && !loading && (
+        <View style={styles.notice}>
+          <Banner tone="error" text={errorText(error)} actionLabel={onRetry ? 'Повторить' : undefined} onAction={onRetry} />
+        </View>
+      )}
+      {(loading || (!transcript && !error)) && <StateView loading message="Загружаю субтитры…" />}
       {visible && (
         <View style={styles.listWrap}>
           <FlatList
@@ -155,6 +166,7 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
           />
           {!follow && current >= 0 && (
             <Pressable testID="transcript-follow" role="button" style={styles.followBtn} onPress={() => setFollow(true)}>
+              <Icon name="follow" size={18} color={colors.onPrimary} />
               <Text style={styles.followText}>К текущему моменту · {formatTime(time)}</Text>
             </Pressable>
           )}
@@ -167,24 +179,32 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
 const styles = StyleSheet.create({
   panel: { flex: 1 },
   chipsRow: { flexGrow: 0 },
-  chips: { gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.card },
-  chipActive: { backgroundColor: colors.chipActive },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.text },
-  notice: { paddingHorizontal: 12, paddingBottom: 6 },
+  notice: { paddingHorizontal: space.md, paddingVertical: space.xs },
   listWrap: { flex: 1 },
-  content: { paddingHorizontal: 8, paddingBottom: 72 },
-  line: { flexDirection: 'row', gap: 8, padding: 8, borderRadius: 8, borderLeftWidth: 3, borderColor: 'transparent' },
-  lineActive: { backgroundColor: colors.activeBg, borderColor: colors.accent },
-  text: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.text },
+  content: { paddingHorizontal: space.md, paddingBottom: 72 },
+  line: {
+    flexDirection: 'row',
+    gap: space.sm,
+    padding: space.sm,
+    borderRadius: radius.sm,
+    borderLeftWidth: 3,
+    borderColor: 'transparent',
+  },
+  lineActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  pressed: { opacity: 0.6 },
+  text: { flex: 1 },
   followBtn: {
     position: 'absolute',
-    bottom: 12,
+    bottom: space.md,
     alignSelf: 'center',
-    backgroundColor: colors.chipActive,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: TOUCH,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.22)',
   },
-  followText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  followText: { color: colors.onPrimary, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },
 });

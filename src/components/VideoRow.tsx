@@ -1,26 +1,24 @@
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatCount, formatDate, formatTime } from '../lib/format';
+import { formatCount, formatDate } from '../lib/format';
 import type { VideoItem } from '../lib/types';
-import { colors } from './theme';
+import { colors, space, type } from './theme';
+import { Thumbnail } from './Thumbnail';
 
 export const VideoRow = memo(function VideoRow({ item, onPress }: { item: VideoItem; onPress: (v: VideoItem) => void }) {
   return (
-    <Pressable onPress={() => onPress(item)} style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}>
-      <View style={styles.thumbWrap}>
-        <Image source={item.thumbnail} style={styles.thumb} contentFit="cover" transition={150} recyclingKey={item.id} />
-        {item.durationSec ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{formatTime(item.durationSec)}</Text>
-          </View>
-        ) : null}
-      </View>
+    <Pressable
+      role="button"
+      onPress={() => onPress(item)}
+      android_ripple={{ color: colors.surfacePressed }}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
+      <Thumbnail source={item.thumbnail} durationSec={item.durationSec} recyclingKey={item.id} />
       <View style={styles.meta}>
-        <Text style={styles.title} numberOfLines={3}>
+        <Text style={type.label} numberOfLines={3}>
           {item.title}
         </Text>
-        <Text style={styles.sub}>
+        <Text style={type.micro}>
           {formatDate(item.publishedAt)}
           {item.viewCount != null ? ` · ${formatCount(item.viewCount)} просм.` : ''}
         </Text>
@@ -29,21 +27,24 @@ export const VideoRow = memo(function VideoRow({ item, onPress }: { item: VideoI
   );
 });
 
+/** Placeholder with the shape of a row while the first page loads. */
+export function VideoRowSkeleton() {
+  return (
+    <View aria-hidden style={styles.row}>
+      <View style={styles.boneThumb} />
+      <View style={styles.meta}>
+        <View style={[styles.bone, { width: '92%' }]} />
+        <View style={[styles.bone, { width: '64%' }]} />
+        <View style={[styles.bone, { width: '40%', height: 10 }]} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 12 },
-  thumbWrap: { width: 160, aspectRatio: 16 / 9, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.border },
-  thumb: { width: '100%', height: '100%' },
-  badge: {
-    position: 'absolute',
-    right: 4,
-    bottom: 4,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  meta: { flex: 1, gap: 4 },
-  title: { fontSize: 14, fontWeight: '600', color: colors.text },
-  sub: { fontSize: 12, color: colors.muted },
+  row: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.md },
+  pressed: { backgroundColor: colors.surface },
+  meta: { flex: 1, gap: 6 },
+  boneThumb: { width: '38%', maxWidth: 168, aspectRatio: 16 / 9, borderRadius: 8, backgroundColor: colors.surface },
+  bone: { height: 13, borderRadius: 4, backgroundColor: colors.surface },
 });

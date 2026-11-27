@@ -38,3 +38,10 @@ export function formatCount(n?: number): string {
   if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')} тыс.`;
   return String(n);
 }
+
+/** fetch reports a missing connection in English and in different words on each platform. */
+export function errorText(message: string): string {
+  return /network request failed|failed to fetch/i.test(message)
+    ? 'Нет связи с сервером. Проверьте интернет и повторите.'
+    : message;
+}

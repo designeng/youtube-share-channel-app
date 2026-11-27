@@ -1,14 +1,17 @@
 /** One row under the player: download the video, follow the progress, manage the saved copy. */
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { confirm } from '../../lib/confirm';
 import { formatBytes } from '../../lib/format';
 import { cancelDownload, retryTranscripts, startDownload, useActiveDownloads, type ActiveDownload } from '../../lib/offline/manager';
 import type { DownloadRecord } from '../../lib/offline/types';
 import { useSettings } from '../../lib/settings';
 import type { VideoDetails } from '../../lib/types';
-import { colors } from '../theme';
-import { shared } from './styles';
+import { colors, space, type } from '../theme';
+import { Button } from '../ui/Button';
+import { Icon } from '../ui/Icon';
+import { IconButton } from '../ui/IconButton';
+import { ProgressBar } from '../ui/ProgressBar';
 
 export function downloadStatus({ phase, progress, error }: ActiveDownload) {
   if (phase === 'error') return error;
@@ -30,8 +33,10 @@ export function DownloadBar({ video, record, playingFile, onPlayFile, onDelete }
   const { settings } = useSettings();
   const active = useActiveDownloads()[video.id];
   const [retrying, setRetrying] = useState(false);
+  const failed = active?.phase === 'error';
 
-  const start = () => startDownload(video, {
+  const start = () =>
+    startDownload(video, {
       wifiOnly: settings.wifiOnly,
       langs: settings.offlineLangs,
       reviewTtlMin: settings.cacheTtlMin,
@@ -48,57 +53,69 @@ export function DownloadBar({ video, record, playingFile, onPlayFile, onDelete }
     setRetrying(false);
   };
 
-  const action = (testID: string, label: string, onPress: () => void, disabled?: boolean) => (
-    <Pressable testID={testID} role="button" onPress={onPress} disabled={disabled} hitSlop={8}>
-      <Text style={shared.link}>{label}</Text>
-    </Pressable>
-  );
-
   return (
     <View testID="download-bar" style={styles.bar}>
       {record ? (
         <>
           <View style={styles.row}>
-            <Text style={styles.text}>
-              ✓ Скачано · {formatBytes(record.bytes)}
+            <Icon name="done" size={18} color={colors.success} />
+            <Text style={[type.caption, styles.text]}>
+              Скачано · {formatBytes(record.bytes)}
               {record.quality ? ` · ${record.quality}` : ''}
               {playingFile ? ' · из файла' : ''}
             </Text>
-            {!playingFile && action('download-play', 'Смотреть из файла', onPlayFile)}
-            {action('download-delete', 'Удалить', askDelete)}
+            {!playingFile && (
+              <Button small variant="secondary" testID="download-play" icon="play" label="Из файла" onPress={onPlayFile} />
+            )}
+            <IconButton testID="download-delete" icon="trash" size={20} color={colors.muted} label="Удалить скачанное" onPress={askDelete} />
           </View>
           {record.missingLangs.length > 0 && (
             <View style={styles.row}>
-              <Text style={styles.text}>Нет субтитров: {record.missingLangs.join(', ')}</Text>
-              {action('download-retry', retrying ? 'Загружаю…' : 'Дозагрузить', retry, retrying)}
+              <Icon name="alert" size={18} color={colors.warnText} />
+              <Text style={[type.caption, styles.text]}>Нет субтитров: {record.missingLangs.join(', ')}</Text>
+              <Button
+                small
+                variant="ghost"
+                testID="download-retry"
+                label={retrying ? 'Загружаю…' : 'Дозагрузить'}
+                onPress={retry}
+                disabled={retrying}
+              />
             </View>
           )}
         </>
       ) : active ? (
         <View style={styles.row}>
-          <Text style={[styles.text, active.phase === 'error' && { color: colors.accent }]}>{downloadStatus(active)}</Text>
-          {active.phase === 'error' && action('download-start', 'Повторить', start)}
-          {action('download-cancel', active.phase === 'error' ? 'Закрыть' : 'Отмена', () => cancelDownload(video.id))}
+          <Icon name={failed ? 'alert' : 'download'} size={18} color={failed ? colors.danger : colors.muted} />
+          <Text style={[type.caption, styles.text, failed && { color: colors.danger }]}>{downloadStatus(active)}</Text>
+          {failed && <Button small variant="secondary" testID="download-start" label="Повторить" onPress={start} />}
+          <Button
+            small
+            variant="ghost"
+            testID="download-cancel"
+            label={failed ? 'Закрыть' : 'Отмена'}
+            onPress={() => cancelDownload(video.id)}
+          />
         </View>
       ) : (
         <View style={styles.row}>
-          <Text style={styles.text}>Смотреть без интернета</Text>
-          {action('download-start', '⬇︎ Скачать', start)}
+          <Text style={[type.caption, styles.text]}>Смотреть без интернета</Text>
+          <Button small variant="secondary" testID="download-start" icon="download" label="Скачать" onPress={start} />
         </View>
       )}
-      {active?.progress != null && (
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${active.progress * 100}%` }]} />
-        </View>
-      )}
+      {active?.progress != null && <ProgressBar value={active.progress} />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { paddingHorizontal: 12, paddingVertical: 8, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  text: { flex: 1, fontSize: 13, color: colors.muted },
-  track: { height: 3, borderRadius: 2, backgroundColor: colors.card, overflow: 'hidden' },
-  fill: { height: 3, backgroundColor: colors.accent },
+  bar: {
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+    gap: space.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 40 },
+  text: { flex: 1 },
 });

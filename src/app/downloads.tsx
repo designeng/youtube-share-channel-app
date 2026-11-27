@@ -1,12 +1,15 @@
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../components/theme';
+import { colors, radius, space, type } from '../components/theme';
+import { Thumbnail } from '../components/Thumbnail';
+import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
+import { useScreenInsets } from '../components/ui/layout';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { StateView } from '../components/ui/StateView';
 import { downloadStatus } from '../components/video/DownloadBar';
-import { shared } from '../components/video/styles';
 import { confirm } from '../lib/confirm';
-import { formatBytes, formatTime } from '../lib/format';
+import { formatBytes } from '../lib/format';
 import {
   cancelDownload,
   deleteAllDownloads,
@@ -23,9 +26,10 @@ const openVideo = (id: string, title: string) => router.push({ pathname: '/video
 export default function DownloadsScreen() {
   const records = useDownloadList();
   const active = Object.values(useActiveDownloads());
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const total = records.reduce((sum, r) => sum + r.bytes, 0);
   const free = freeSpace();
+  const freeText = free < Number.MAX_SAFE_INTEGER ? `свободно ${formatBytes(free)}` : '';
 
   const askDelete = async (r: DownloadRecord) => {
     const ok = await confirm({ title: 'Удалить скачанное?', message: r.video.title, confirmLabel: 'Удалить', destructive: true });
@@ -46,65 +50,81 @@ export default function DownloadsScreen() {
     <FlatList
       data={records}
       keyExtractor={(r) => r.video.id}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
+      contentContainerStyle={insets}
       ListHeaderComponent={
         <View>
-          <View style={styles.summary}>
-            <Text testID="downloads-summary" style={[shared.hint, { flex: 1 }]}>
-              {records.length ? `Видео: ${records.length} · ${formatBytes(total)}` : 'Пока ничего не скачано.'}
-              {free < Number.MAX_SAFE_INTEGER ? ` · свободно ${formatBytes(free)}` : ''}
-            </Text>
-            {records.length > 0 && (
-              <Pressable testID="delete-all" role="button" onPress={askDeleteAll} hitSlop={8}>
-                <Text style={styles.danger}>Удалить все</Text>
-              </Pressable>
-            )}
-          </View>
+          {records.length > 0 && (
+            <View style={styles.summary}>
+              <Text testID="downloads-summary" style={[type.caption, styles.fill]}>
+                {[`Видео: ${records.length}`, formatBytes(total), freeText].filter(Boolean).join(' · ')}
+              </Text>
+              <Button small variant="danger" testID="delete-all" label="Удалить все" onPress={askDeleteAll} />
+            </View>
+          )}
           {active.map((d) => (
-            <View key={d.videoId} style={styles.row}>
-              <Pressable style={styles.meta} onPress={() => openVideo(d.videoId, d.title)}>
-                <Text style={styles.title} numberOfLines={2}>
-                  {d.title}
-                </Text>
-                <Text style={d.phase === 'error' ? shared.error : shared.hint}>{downloadStatus(d)}</Text>
-              </Pressable>
-              <Pressable role="button" onPress={() => cancelDownload(d.videoId)} hitSlop={8}>
-                <Text style={styles.danger}>{d.phase === 'error' ? 'Закрыть' : 'Отмена'}</Text>
-              </Pressable>
+            <View key={d.videoId} style={styles.active}>
+              <View style={styles.activeRow}>
+                <Pressable role="button" style={styles.meta} onPress={() => openVideo(d.videoId, d.title)}>
+                  <Text style={type.label} numberOfLines={2}>
+                    {d.title}
+                  </Text>
+                  <Text style={[type.caption, d.phase === 'error' && { color: colors.danger }]}>{downloadStatus(d)}</Text>
+                </Pressable>
+                <Button
+                  small
+                  variant="ghost"
+                  label={d.phase === 'error' ? 'Закрыть' : 'Отмена'}
+                  onPress={() => cancelDownload(d.videoId)}
+                />
+              </View>
+              {d.progress != null && <ProgressBar value={d.progress} />}
             </View>
           ))}
         </View>
       }
+      ListEmptyComponent={
+        active.length ? undefined : (
+          <StateView
+            testID="downloads-summary"
+            icon="download"
+            title="Пока ничего не скачано"
+            message={[
+              'Откройте видео и нажмите «Скачать», чтобы смотреть его без интернета вместе с таймкодами и субтитрами.',
+              freeText && `Сейчас ${freeText}.`,
+            ]
+              .filter(Boolean)
+              .join('\n')}
+          >
+            <Button variant="secondary" label="К каналам" onPress={() => router.dismissTo('/')} />
+          </StateView>
+        )
+      }
       renderItem={({ item: r }) => (
         <View testID={`download-${r.video.id}`} style={styles.row}>
           <Pressable
-            style={({ pressed }) => [styles.main, pressed && { opacity: 0.6 }]}
+            role="button"
+            style={({ pressed }) => [styles.main, pressed && styles.pressed]}
             onPress={() => openVideo(r.video.id, r.video.title)}
           >
-            <Image source={thumbnailUri(r)} style={styles.thumb} contentFit="cover" />
+            <Thumbnail source={thumbnailUri(r)} durationSec={r.video.durationSec} />
             <View style={styles.meta}>
-              <Text style={styles.title} numberOfLines={2}>
+              <Text style={type.label} numberOfLines={2}>
                 {r.video.title}
               </Text>
-              <Text style={shared.hint} numberOfLines={1}>
+              <Text style={type.micro} numberOfLines={1}>
                 {r.video.channelTitle}
               </Text>
-              <Text style={shared.hint}>
+              <Text style={type.micro}>
                 {[
-                  r.video.durationSec ? formatTime(r.video.durationSec) : '',
                   formatBytes(r.bytes),
                   r.transcripts.length
                     ? `субтитры: ${[...new Set(r.transcripts.map(transcriptLangOf))].join(', ')}`
                     : 'без субтитров',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+                ].join(' · ')}
               </Text>
             </View>
           </Pressable>
-          <Pressable aria-label="Удалить" role="button" onPress={() => askDelete(r)} hitSlop={8}>
-            <Text style={styles.danger}>Удалить</Text>
-          </Pressable>
+          <IconButton icon="trash" size={20} color={colors.muted} label="Удалить" onPress={() => askDelete(r)} />
         </View>
       )}
     />
@@ -112,11 +132,19 @@ export default function DownloadsScreen() {
 }
 
 const styles = StyleSheet.create({
-  summary: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  main: { flex: 1, flexDirection: 'row', gap: 10 },
-  thumb: { width: 112, aspectRatio: 16 / 9, borderRadius: 8, backgroundColor: colors.border },
-  meta: { flex: 1, gap: 2 },
-  title: { fontSize: 14, fontWeight: '600', color: colors.text },
-  danger: { color: colors.accent, fontWeight: '600', fontSize: 13 },
+  fill: { flex: 1 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  active: {
+    marginHorizontal: space.lg,
+    marginVertical: space.xs,
+    padding: space.md,
+    gap: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  activeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  row: { flexDirection: 'row', alignItems: 'center', paddingRight: space.sm },
+  main: { flex: 1, flexDirection: 'row', gap: space.md, paddingLeft: space.lg, paddingRight: space.xs, paddingVertical: space.sm },
+  pressed: { backgroundColor: colors.surface },
+  meta: { flex: 1, gap: 3 },
 });
