@@ -2,7 +2,7 @@ PKG := com.designeng.channelviewer
 APK_DEBUG := android/app/build/outputs/apk/debug/app-debug.apk
 APK_RELEASE := android/app/build/outputs/apk/release/app-release.apk
 
-.PHONY: reinstall build install release release-install release-build bump-version
+.PHONY: reinstall build install release release-install release-build bump-version play-build
 
 # Version bump type for `make release`: patch | minor | major
 BUMP ?= patch
@@ -46,3 +46,20 @@ release-build:
 release-install:
 	adb install -r $(APK_RELEASE)
 	adb shell monkey -p $(PKG) -c android.intent.category.LAUNCHER 1
+
+# --- Google Play variant (no downloads, no unofficial transcripts) ---
+
+PLAY_AAB := dist-play/app-release.aab
+
+# Builds the AAB, then regenerates android/ for the personal build, so the two never mix.
+# NOTE: still signed with the debug key - Google Play needs an upload key.
+play-build:
+	@[ -n "$$EXPO_PUBLIC_REPORT_URL" ] || echo "WARNING: EXPO_PUBLIC_REPORT_URL is not set, AI reports will only open the share sheet."
+	@status=0; \
+	( export EXPO_PUBLIC_APP_VARIANT=play && \
+	  npx expo prebuild -p android --clean && \
+	  (cd android && ./gradlew bundleRelease) && \
+	  mkdir -p dist-play && cp android/app/build/outputs/bundle/release/app-release.aab $(PLAY_AAB) ) || status=$$?; \
+	npx expo prebuild -p android --clean || status=$$?; \
+	[ $$status -eq 0 ] && echo "Built $(PLAY_AAB)"; \
+	exit $$status

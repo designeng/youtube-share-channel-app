@@ -99,6 +99,9 @@ export const en = {
     reviewLangPlaceholder: 'English',
     reviewLangHelp: 'The AI writes reviews in this language, whatever the language of the video.',
     cacheTtl: 'AI review cache (minutes)',
+    cacheTtlHelpPlay:
+      'How long to keep a finished review of a video fragment so the AI is not asked again. The default is 60 (1 hour), 0 disables the cache. “Regenerate” always refreshes it.',
+    geminiHelpPlay: 'Google AI Studio free tier. Gemini watches the video itself (public videos only). Key:',
     cacheTtlHelp:
       'How long to keep a finished review of a video fragment so the AI is not asked again. The default is 60 (1 hour), 0 disables the cache. “Regenerate” always refreshes it. Reviews of downloaded videos are stored with the file and do not expire.',
     models: (n: number) => `Models (${n})`,
@@ -113,6 +116,7 @@ export const en = {
     gettingTranscript: 'Getting the transcript…',
     generating: 'Writing the review…',
     watching: 'No subtitles — Gemini is watching the video…',
+    watchingPlay: 'Gemini is watching the video…',
     fileError: 'Could not play the file. Delete it and download again.',
     openInYouTube: 'Open in YouTube',
     loadFailed: 'Could not load the video',
@@ -142,6 +146,18 @@ export const en = {
     openRouterEmpty: 'OpenRouter returned an empty response.',
     needsTranscript:
       'OpenRouter cannot analyze a video without a transcript. Choose Gemini (it can watch videos) or load subtitles.',
+  },
+  report: {
+    button: 'Report',
+    title: 'Report this AI text',
+    reasons: { offensive: 'Offensive', dangerous: 'Dangerous', inaccurate: 'Inaccurate', other: 'Other' },
+    comment: 'Comment (optional)',
+    willSend:
+      'The developer receives the reason, your comment, the AI text, the video ID, the model and the language. API keys are not sent.',
+    willShare: 'Choose where to send the report: it holds the reason, your comment and the AI text.',
+    send: 'Send',
+    sent: 'Thank you, the report has been sent.',
+    failed: 'Could not send the report. Check your connection and try again.',
   },
   chapters: {
     none: 'No timecodes',

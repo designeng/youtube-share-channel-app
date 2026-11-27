@@ -4,6 +4,7 @@ import { DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, type AiConfig } from '.
 import { getLanguage } from './i18n';
 import * as SecureStore from './secureStore';
 import type { ChannelInfo } from './types';
+import { IS_PLAY } from './variant';
 
 export type Settings = AiConfig & {
   youtubeKey: string;
@@ -57,6 +58,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         Object.assign(next, JSON.parse((await AsyncStorage.getItem(PREFS_KEY)) ?? '{}'));
         for (const k of SECRET_KEYS) next[k] = (await SecureStore.getItemAsync(k)) ?? '';
       } catch {}
+      // Only Gemini works without a transcript, and the Play build has none.
+      if (IS_PLAY) next.provider = 'gemini';
       ref.current = next;
       setSettings(next);
       setLoaded(true);

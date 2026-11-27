@@ -29,6 +29,7 @@ import { listGeminiModels, listOpenRouterFreeModels, type AiProvider, type Model
 import { getLanguage, useStrings } from '../lib/i18n';
 import { OFFLINE_LANGS } from '../lib/offline/types';
 import { useSettings, type Settings } from '../lib/settings';
+import { IS_PLAY } from '../lib/variant';
 
 const PROVIDERS: { key: AiProvider; label: string }[] = [
   { key: 'gemini', label: 'Google Gemini' },
@@ -165,59 +166,65 @@ export default function SettingsScreen() {
             help={s.settings.youtubeHelp}
             link="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
           />
-          <Field
-            label={s.settings.transcriptLang}
-            value={draft.transcriptLang}
-            onChange={(transcriptLang) => set({ transcriptLang: transcriptLang.trim() || getLanguage() })}
-            placeholder={getLanguage()}
-            help={s.settings.transcriptLangHelp}
-          />
+          {!IS_PLAY && (
+            <Field
+              label={s.settings.transcriptLang}
+              value={draft.transcriptLang}
+              onChange={(transcriptLang) => set({ transcriptLang: transcriptLang.trim() || getLanguage() })}
+              placeholder={getLanguage()}
+              help={s.settings.transcriptLangHelp}
+            />
+          )}
         </Section>
 
-        <Section title={s.settings.downloading}>
-          <View style={styles.switchRow}>
-            <View style={[styles.fill, styles.switchText]}>
-              <Text style={type.label}>{s.settings.wifiOnly}</Text>
-              <Text style={type.micro}>{s.settings.wifiOnlyHelp}</Text>
+        {!IS_PLAY && (
+          <Section title={s.settings.downloading}>
+            <View style={styles.switchRow}>
+              <View style={[styles.fill, styles.switchText]}>
+                <Text style={type.label}>{s.settings.wifiOnly}</Text>
+                <Text style={type.micro}>{s.settings.wifiOnlyHelp}</Text>
+              </View>
+              <Switch
+                testID="wifi-only"
+                aria-label={s.settings.wifiOnly}
+                value={draft.wifiOnly}
+                onValueChange={(wifiOnly) => set({ wifiOnly })}
+                trackColor={{ false: colors.border, true: colors.switchOn }}
+                thumbColor={Platform.OS === 'ios' ? undefined : '#ffffff'}
+                {...(Platform.OS === 'web' ? { activeThumbColor: '#ffffff' } : undefined)}
+              />
             </View>
-            <Switch
-              testID="wifi-only"
-              aria-label={s.settings.wifiOnly}
-              value={draft.wifiOnly}
-              onValueChange={(wifiOnly) => set({ wifiOnly })}
-              trackColor={{ false: colors.border, true: colors.switchOn }}
-              thumbColor={Platform.OS === 'ios' ? undefined : '#ffffff'}
-              {...(Platform.OS === 'web' ? { activeThumbColor: '#ffffff' } : undefined)}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={type.label}>{s.settings.offlineSubtitles}</Text>
-            <View style={styles.chips}>
-              {OFFLINE_LANGS.map((l) => {
-                const on = draft.offlineLangs.includes(l.code);
-                return (
-                  <Chip
-                    key={l.code}
-                    role="checkbox"
-                    label={l.label}
-                    active={on}
-                    onPress={() =>
-                      set({
-                        offlineLangs: on
-                          ? draft.offlineLangs.filter((c) => c !== l.code)
-                          : [...draft.offlineLangs, l.code],
-                      })
-                    }
-                  />
-                );
-              })}
+            <View style={styles.field}>
+              <Text style={type.label}>{s.settings.offlineSubtitles}</Text>
+              <View style={styles.chips}>
+                {OFFLINE_LANGS.map((l) => {
+                  const on = draft.offlineLangs.includes(l.code);
+                  return (
+                    <Chip
+                      key={l.code}
+                      role="checkbox"
+                      label={l.label}
+                      active={on}
+                      onPress={() =>
+                        set({
+                          offlineLangs: on
+                            ? draft.offlineLangs.filter((c) => c !== l.code)
+                            : [...draft.offlineLangs, l.code],
+                        })
+                      }
+                    />
+                  );
+                })}
+              </View>
+              <Text style={type.micro}>{s.settings.offlineSubtitlesHelp}</Text>
             </View>
-            <Text style={type.micro}>{s.settings.offlineSubtitlesHelp}</Text>
-          </View>
-        </Section>
+          </Section>
+        )}
 
         <Section title={s.settings.aiReviews}>
-          <Segmented options={PROVIDERS} value={draft.provider} onChange={(provider) => set({ provider })} />
+          {!IS_PLAY && (
+            <Segmented options={PROVIDERS} value={draft.provider} onChange={(provider) => set({ provider })} />
+          )}
 
           {draft.provider === 'gemini' ? (
             <Field
@@ -227,7 +234,7 @@ export default function SettingsScreen() {
               onChange={(geminiKey) => set({ geminiKey })}
               secure
               placeholder="AIza…"
-              help={s.settings.geminiHelp}
+              help={IS_PLAY ? s.settings.geminiHelpPlay : s.settings.geminiHelp}
               link="https://aistudio.google.com/apikey"
             />
           ) : (
@@ -278,7 +285,7 @@ export default function SettingsScreen() {
             }}
             placeholder="60"
             keyboardType="number-pad"
-            help={s.settings.cacheTtlHelp}
+            help={IS_PLAY ? s.settings.cacheTtlHelpPlay : s.settings.cacheTtlHelp}
           />
         </Section>
       </ScrollView>

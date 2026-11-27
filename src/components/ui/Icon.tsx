@@ -21,6 +21,7 @@ const ICONS = {
   external: { ios: 'arrow.up.right', android: 'open_in_new', web: 'open_in_new' },
   eye: { ios: 'eye', android: 'visibility', web: 'visibility' },
   eyeOff: { ios: 'eye.slash', android: 'visibility_off', web: 'visibility_off' },
+  flag: { ios: 'flag', android: 'flag', web: 'flag' },
   follow: { ios: 'scope', android: 'my_location', web: 'my_location' },
   info: { ios: 'info.circle', android: 'info', web: 'info' },
   link: { ios: 'link', android: 'link', web: 'link' },
