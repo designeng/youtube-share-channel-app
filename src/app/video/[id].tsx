@@ -5,27 +5,31 @@ import { playerErrorText, type PlayerHandle } from '../../components/player';
 import { AboutPanel } from '../../components/video/AboutPanel';
 import { AiPanel, type ReviewState } from '../../components/video/AiPanel';
 import { ChaptersPanel } from '../../components/video/ChaptersPanel';
+import { DownloadBar } from '../../components/video/DownloadBar';
+import { LocalPlayer } from '../../components/LocalPlayer';
 import { ModeBar, type Mode } from '../../components/video/ModeBar';
 import { shared } from '../../components/video/styles';
 import { TranscriptPanel, type TrackChoice, type TrackOption } from '../../components/video/TranscriptPanel';
 import { YouTubePlayer } from '../../components/YouTubePlayer';
 import { generateReview } from '../../lib/ai';
-import { autoParts, parseChapters } from '../../lib/chapters';
+import { videoParts } from '../../lib/chapters';
+import { deleteDownload, readSavedReviews, saveReviews, useDownload } from '../../lib/offline/manager';
+import { videoUri } from '../../lib/offline/store';
+import { transcriptLangOf } from '../../lib/offline/transcripts';
 import { getCachedReview, setCachedReview, useSettings } from '../../lib/settings';
-import { getTranscript, getTranscriptInfo, pickTrack } from '../../lib/transcript';
+import { getTranscript, getTranscriptInfo, originalTrack, pickTrack } from '../../lib/transcript';
 import type { Chapter, Transcript, TranscriptInfo, VideoDetails } from '../../lib/types';
 import { getVideo } from '../../lib/youtubeApi';
 
 const base = (c?: string) => (c ?? '').toLowerCase().split('-')[0];
 
-/** Best transcript for the AI: original language (more accurate than YouTube's machine translation). */
-function originalTrack(info: TranscriptInfo, audioLang?: string) {
-  const a = base(audioLang);
-  return (
-    info.tracks.find((t) => !t.isAuto && a && base(t.languageCode) === a) ??
-    info.tracks.find((t) => t.isAuto) ??
-    info.tracks.find((t) => !t.isAuto)
-  );
+const choiceOf = (t: Transcript): TrackChoice => ({ languageCode: t.languageCode, tlang: t.translatedTo });
+const sameChoice = (t: Transcript, c?: TrackChoice) => t.languageCode === c?.languageCode && t.translatedTo === c.tlang;
+
+function savedLabel(t: Transcript) {
+  if (t.translatedTo) return `Перевод → ${t.translatedTo}`;
+  const name = { ru: 'Русский', en: 'English' }[transcriptLangOf(t)] ?? t.languageCode;
+  return t.isAuto ? `${name} (авто)` : name;
 }
 
 export default function VideoScreen() {
@@ -34,7 +38,18 @@ export default function VideoScreen() {
   const { width } = useWindowDimensions();
   const player = useRef<PlayerHandle>(null);
 
-  const [video, setVideo] = useState<VideoDetails>();
+  // A downloaded copy gives the video details, timecodes, transcripts and the file itself without a network.
+  const record = useDownload(id);
+  const saved = record?.transcripts;
+  const hasRecord = !!record;
+  const hasSaved = !!saved?.length;
+  // The player is picked when the screen opens: a download finishing meanwhile must not restart playback.
+  const [local, setLocal] = useState<{ startSec: number } | undefined>(() => (record ? { startSec: 0 } : undefined));
+  const [fileError, setFileError] = useState(false);
+  const playLocal = !!record && !!local;
+
+  const [remoteVideo, setRemoteVideo] = useState<VideoDetails>();
+  const video = record?.video ?? remoteVideo;
   const [error, setError] = useState<string>();
   const [time, setTime] = useState(0);
   const [playerError, setPlayerError] = useState<number>();
@@ -53,9 +68,9 @@ export default function VideoScreen() {
   const aiTranscript = useRef<Promise<Transcript | undefined> | null>(null);
 
   useEffect(() => {
-    if (!loaded) return;
-    getVideo(id, settings.youtubeKey).then(setVideo, (e) => setError(e.message));
-  }, [id, loaded, settings.youtubeKey]);
+    if (!loaded || hasRecord) return;
+    getVideo(id, settings.youtubeKey).then(setRemoteVideo, (e) => setError(e.message));
+  }, [id, loaded, hasRecord, settings.youtubeKey]);
 
   const selectChoice = (c: TrackChoice) => {
     setTrLoading(true);
@@ -65,7 +80,7 @@ export default function VideoScreen() {
 
   // Caption tracks + default choice (preferred locale; YouTube auto-translation if needed).
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || hasSaved) return;
     getTranscriptInfo(id, settings.transcriptLang)
       .then((i) => {
         setInfo(i);
@@ -74,10 +89,10 @@ export default function VideoScreen() {
         selectChoice({ languageCode: p.track.languageCode, tlang: p.tlang });
       })
       .catch((e) => setTrError(e.message));
-  }, [id, loaded, settings.transcriptLang]);
+  }, [id, loaded, hasSaved, settings.transcriptLang]);
 
   useEffect(() => {
-    if (!choice) return;
+    if (!choice || hasSaved) return;
     let cancelled = false;
     getTranscript(id, { ...choice, hl: settings.transcriptLang })
       .then((t) => !cancelled && setTranscript(t))
@@ -86,27 +101,33 @@ export default function VideoScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, choice, settings.transcriptLang]);
+  }, [id, choice, hasSaved, settings.transcriptLang]);
 
-  const chapters = useMemo(() => (video ? parseChapters(video.description, video.durationSec) : []), [video]);
-  const hasChapters = chapters.length > 0;
-  const parts: Chapter[] = useMemo(
-    () => (hasChapters ? chapters : video?.durationSec ? autoParts(video.durationSec) : []),
-    [chapters, hasChapters, video],
+  const { authored: hasChapters, parts } = useMemo(
+    () => (video ? videoParts(video) : { authored: false, parts: [] as Chapter[] }),
+    [video],
   );
 
-  // Restore cached reviews.
+  // Restore reviews: kept with the download, else still in the cache.
   useEffect(() => {
     if (!video) return;
     (async () => {
       const next: Record<string, ReviewState> = {};
+      const kept = readSavedReviews(video.id);
       for (const t of [...parts.map((p) => p.index), 'all' as const]) {
-        const text = await getCachedReview(video.id, t, settings.cacheTtlMin);
+        const text = kept[String(t)] ?? (await getCachedReview(video.id, t, settings.cacheTtlMin));
         if (text) next[String(t)] = { text };
       }
       setReviews((r) => ({ ...next, ...r }));
     })();
   }, [video, parts, settings.cacheTtlMin]);
+
+  // The video may get downloaded while its reviews are already on the screen.
+  useEffect(() => {
+    if (!hasRecord) return;
+    const done = Object.entries(reviews).flatMap(([target, r]) => (r.text ? [[target, r.text]] : []));
+    saveReviews(id, Object.fromEntries(done));
+  }, [id, hasRecord, reviews]);
 
   const seek = useCallback((sec: number) => {
     player.current?.seekTo(sec);
@@ -114,6 +135,8 @@ export default function VideoScreen() {
   }, []);
 
   const getAiTranscript = useCallback(async () => {
+    // The first saved transcript is the original one.
+    if (saved?.length) return saved[0];
     if (!aiTranscript.current) {
       aiTranscript.current = (async () => {
         const i = info ?? (await getTranscriptInfo(id, settings.transcriptLang).catch(() => undefined));
@@ -124,7 +147,7 @@ export default function VideoScreen() {
       })();
     }
     return aiTranscript.current;
-  }, [id, info, settings.transcriptLang, transcript, video?.defaultAudioLanguage]);
+  }, [id, info, saved, settings.transcriptLang, transcript, video?.defaultAudioLanguage]);
 
   const patchReview = (k: string, p: ReviewState) => setReviews((r) => ({ ...r, [k]: { ...r[k], ...p } }));
 
@@ -142,6 +165,8 @@ export default function VideoScreen() {
           patchReview(k, { status }),
         );
         await setCachedReview(video.id, target, text, settings.cacheTtlMin);
+        // Here too: the screen may be closed by now.
+        saveReviews(video.id, { [k]: text });
         patchReview(k, { text, loading: false, status: undefined });
       } catch (e: any) {
         patchReview(k, { error: e.message, loading: false, status: undefined });
@@ -202,11 +227,44 @@ export default function VideoScreen() {
     return opts;
   }, [info, settings.transcriptLang]);
 
+  const savedCurrent =
+    saved?.find((t) => sameChoice(t, choice)) ??
+    saved?.find((t) => transcriptLangOf(t) === base(settings.transcriptLang)) ??
+    saved?.[0];
+  const savedOptions = saved?.map((t) => ({ label: savedLabel(t), choice: choiceOf(t) }));
+
+  const playLocalFromHere = () => {
+    setFileError(false);
+    setPlayerError(undefined);
+    setLocal({ startSec: time });
+  };
+
+  const removeDownload = () => {
+    deleteDownload(id);
+    setLocal(undefined);
+  };
+
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: video?.title ?? title ?? '' }} />
-      <YouTubePlayer ref={player} videoId={id} height={h} onTime={setTime} onError={setPlayerError} />
-      {playerError != null && (
+      {playLocal ? (
+        <LocalPlayer
+          ref={player}
+          uri={videoUri(record)}
+          height={h}
+          startSec={local.startSec}
+          onTime={setTime}
+          onError={() => setFileError(true)}
+        />
+      ) : (
+        <YouTubePlayer ref={player} videoId={id} height={h} onTime={setTime} onError={setPlayerError} />
+      )}
+      {playLocal && fileError && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Не удалось воспроизвести файл. Удалите его и скачайте заново.</Text>
+        </View>
+      )}
+      {!playLocal && playerError != null && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>{playerErrorText(playerError)}</Text>
           <Pressable onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${id}&t=${Math.floor(time)}s`)}>
@@ -215,16 +273,26 @@ export default function VideoScreen() {
         </View>
       )}
 
+      {video && (
+        <DownloadBar
+          video={video}
+          record={record}
+          playingFile={playLocal}
+          onPlayFile={playLocalFromHere}
+          onDelete={removeDownload}
+        />
+      )}
+
       <View style={styles.content}>
         {mode === 'transcript' ? (
           <TranscriptPanel
-            transcript={transcript}
-            loading={trLoading}
-            error={trError}
-            options={trackOptions}
-            choice={choice}
+            transcript={savedCurrent ?? transcript}
+            loading={!hasSaved && trLoading}
+            error={hasSaved ? undefined : trError}
+            options={savedOptions?.length ? savedOptions : trackOptions}
+            choice={savedCurrent ? choiceOf(savedCurrent) : choice}
             time={time}
-            onChoose={selectChoice}
+            onChoose={hasSaved ? setChoice : selectChoice}
             onSeek={seek}
           />
         ) : error ? (

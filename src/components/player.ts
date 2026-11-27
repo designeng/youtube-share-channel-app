@@ -14,6 +14,15 @@ export type PlayerProps = {
   onReady?: () => void;
 };
 
+export type LocalPlayerProps = {
+  /** file on the device */
+  uri: string;
+  height: number;
+  startSec?: number;
+  onTime?: (sec: number) => void;
+  onError?: () => void;
+};
+
 /** How often the current playback position is reported (drives the transcript highlight). */
 export const PLAYER_POLL_MS = 500;
 

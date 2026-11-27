@@ -10,6 +10,10 @@ export type Settings = AiConfig & {
   transcriptLang: string;
   /** How long a generated AI review stays cached, in minutes. 0 disables caching. */
   cacheTtlMin: number;
+  /** Download videos over Wi-Fi only (a single download can still be allowed on mobile data). */
+  wifiOnly: boolean;
+  /** Languages whose transcripts are saved together with a downloaded video. */
+  offlineLangs: string[];
 };
 
 const SECRET_KEYS = ['youtubeKey', 'geminiKey', 'openrouterKey'] as const;
@@ -24,6 +28,8 @@ const DEFAULTS: Settings = {
   outputLanguage: 'русский',
   transcriptLang: 'ru',
   cacheTtlMin: 60,
+  wifiOnly: true,
+  offlineLangs: ['ru', 'en'],
 };
 
 const PREFS_KEY = 'prefs.v1';

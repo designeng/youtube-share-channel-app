@@ -74,6 +74,9 @@ async function mockBackend(page: Page) {
         return route.fulfill({ contentType: 'text/javascript', body: FAKE_IFRAME_API });
       if (url.pathname === '/youtubei/v1/player')
         return json(route, {
+          streamingData: {
+            formats: [{ itag: 18, url: 'https://rr1.googlevideo.com/videoplayback', mimeType: 'video/mp4', qualityLabel: '360p', contentLength: '4096' }],
+          },
           captions: {
             playerCaptionsTracklistRenderer: {
               captionTracks: [
@@ -87,6 +90,8 @@ async function mockBackend(page: Page) {
             },
           },
         });
+      if (url.pathname === '/videoplayback')
+        return route.fulfill({ contentType: 'video/mp4', headers: { 'Access-Control-Allow-Origin': '*' }, body: '0'.repeat(4096) });
       if (url.pathname === '/api/timedtext') return json(route, { events: SEGMENTS });
       if (url.hostname === 'generativelanguage.googleapis.com') {
         const prompt: string = route.request().postDataJSON().contents[0].parts[0].text;
