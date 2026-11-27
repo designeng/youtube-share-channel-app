@@ -1,25 +1,29 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playerErrorText, type PlayerHandle } from '../../components/player';
+import { MAX_WIDTH, space } from '../../components/theme';
+import { Banner } from '../../components/ui/Banner';
+import { Button } from '../../components/ui/Button';
+import { StateView } from '../../components/ui/StateView';
 import { AboutPanel } from '../../components/video/AboutPanel';
 import { AiPanel, type ReviewState } from '../../components/video/AiPanel';
 import { ChaptersPanel } from '../../components/video/ChaptersPanel';
 import { DownloadBar } from '../../components/video/DownloadBar';
 import { LocalPlayer } from '../../components/LocalPlayer';
 import { ModeBar, type Mode } from '../../components/video/ModeBar';
-import { shared } from '../../components/video/styles';
 import { TranscriptPanel, type TrackChoice, type TrackOption } from '../../components/video/TranscriptPanel';
 import { YouTubePlayer } from '../../components/YouTubePlayer';
 import { generateReview } from '../../lib/ai';
 import { videoParts } from '../../lib/chapters';
+import { errorText } from '../../lib/format';
 import { deleteDownload, readSavedReviews, saveReviews, useDownload } from '../../lib/offline/manager';
 import { videoUri } from '../../lib/offline/store';
 import { transcriptLangOf } from '../../lib/offline/transcripts';
 import { getCachedReview, setCachedReview, useSettings } from '../../lib/settings';
-import { getTranscript, getTranscriptInfo, originalTrack, pickTrack } from '../../lib/transcript';
+import { forgetTranscriptInfo, getTranscript, getTranscriptInfo, originalTrack, pickTrack } from '../../lib/transcript';
 import type { Chapter, Transcript, TranscriptInfo, VideoDetails } from '../../lib/types';
 import { getVideo } from '../../lib/youtubeApi';
 
@@ -54,6 +58,9 @@ export default function VideoScreen() {
   const [remoteVideo, setRemoteVideo] = useState<VideoDetails>();
   const video = record?.video ?? remoteVideo;
   const [error, setError] = useState<string>();
+  // Bumped by "retry".
+  const [videoAttempt, setVideoAttempt] = useState(0);
+  const [infoAttempt, setInfoAttempt] = useState(0);
   const [time, setTime] = useState(0);
   const [playerError, setPlayerError] = useState<number>();
   const [mode, setMode] = useState<Mode>('chapters');
@@ -73,7 +80,7 @@ export default function VideoScreen() {
   useEffect(() => {
     if (!loaded || hasRecord) return;
     getVideo(id, settings.youtubeKey).then(setRemoteVideo, (e) => setError(e.message));
-  }, [id, loaded, hasRecord, settings.youtubeKey]);
+  }, [id, loaded, hasRecord, settings.youtubeKey, videoAttempt]);
 
   const selectChoice = (c: TrackChoice) => {
     setTrLoading(true);
@@ -92,7 +99,7 @@ export default function VideoScreen() {
         selectChoice({ languageCode: p.track.languageCode, tlang: p.tlang });
       })
       .catch((e) => setTrError(e.message));
-  }, [id, loaded, hasSaved, settings.transcriptLang]);
+  }, [id, loaded, hasSaved, settings.transcriptLang, infoAttempt]);
 
   useEffect(() => {
     if (!choice || hasSaved) return;
@@ -235,6 +242,19 @@ export default function VideoScreen() {
     return opts;
   }, [info, settings.transcriptLang]);
 
+  const retryVideo = () => {
+    setError(undefined);
+    setVideoAttempt((n) => n + 1);
+  };
+
+  const retryTranscript = () => {
+    forgetTranscriptInfo(id);
+    // Keep the track the viewer picked; a new object makes the loading effect run again.
+    if (info && choice) return selectChoice({ ...choice });
+    setTrError(undefined);
+    setInfoAttempt((n) => n + 1);
+  };
+
   const savedCurrent =
     saved?.find((t) => sameChoice(t, choice)) ??
     saved?.find((t) => transcriptLangOf(t) === base(settings.transcriptLang)) ??
@@ -276,15 +296,17 @@ export default function VideoScreen() {
       )}
       {playLocal && fileError && (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Не удалось воспроизвести файл. Удалите его и скачайте заново.</Text>
+          <Banner tone="error" text="Не удалось воспроизвести файл. Удалите его и скачайте заново." />
         </View>
       )}
       {!playLocal && playerError != null && (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>{playerErrorText(playerError)}</Text>
-          <Pressable onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${id}&t=${Math.floor(time)}s`)}>
-            <Text style={shared.link}>Открыть в YouTube</Text>
-          </Pressable>
+          <Banner
+            tone="warn"
+            text={playerErrorText(playerError)}
+            actionLabel="Открыть в YouTube"
+            onAction={() => Linking.openURL(`https://www.youtube.com/watch?v=${id}&t=${Math.floor(time)}s`)}
+          />
         </View>
       )}
 
@@ -299,7 +321,7 @@ export default function VideoScreen() {
           />
         )}
 
-        <View style={styles.content}>
+        <View style={[styles.panel, { paddingLeft: insets.left, paddingRight: insets.right }]}>
           {mode === 'transcript' ? (
             <TranscriptPanel
               transcript={savedCurrent ?? transcript}
@@ -310,11 +332,20 @@ export default function VideoScreen() {
               time={time}
               onChoose={hasSaved ? setChoice : selectChoice}
               onSeek={seek}
+              // Nothing to retry when YouTube says the video has no captions at all.
+              onRetry={info && !info.tracks.length ? undefined : retryTranscript}
             />
-          ) : error ? (
-            <Text style={[shared.error, styles.pad]}>{error}</Text>
+          ) : error && !video ? (
+            <ScrollView>
+              <StateView icon="alert" tone="error" title="Не удалось загрузить видео" message={errorText(error)}>
+                {/key|ключ/i.test(error) && (
+                  <Button icon="settings" label="Открыть настройки" onPress={() => router.push('/settings')} />
+                )}
+                <Button variant="secondary" icon="refresh" label="Повторить" onPress={retryVideo} />
+              </StateView>
+            </ScrollView>
           ) : !video ? (
-            <ActivityIndicator style={{ margin: 24 }} />
+            <StateView loading message="Загружаю видео…" />
           ) : mode === 'chapters' ? (
             <ChaptersPanel
               chapters={parts}
@@ -350,9 +381,9 @@ export default function VideoScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flex: 1 },
+  // Panels use the full height; in portrait on tablets the column stays readable.
+  panel: { flex: 1, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
   fullscreen: { backgroundColor: '#000' },
   hidden: { display: 'none' },
-  pad: { padding: 12 },
-  banner: { backgroundColor: '#fff4e5', padding: 10, gap: 4 },
-  bannerText: { color: '#8a4b00' },
+  banner: { paddingHorizontal: space.md, paddingTop: space.sm },
 });

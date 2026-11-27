@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   liText: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.text },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
-  code: { fontFamily: 'Courier', backgroundColor: colors.card },
+  code: { fontFamily: 'Courier', backgroundColor: colors.border },
   time: { color: colors.link, fontWeight: '600' },
   hr: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 6 },
 });

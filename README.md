@@ -86,6 +86,8 @@ src/app/            экраны (Expo Router)
   downloads.tsx     скачанные видео
   settings.tsx      ключи, модель, языки
 src/components/
+  theme.ts          цвета, отступы, радиусы, текстовые стили
+  ui/               кнопки, поля, чипы, баннеры, пустые состояния, иконки
   video/            нижняя панель и панели режимов
   YouTubePlayer.tsx плеер (.web.tsx — для браузера)
   LocalPlayer.tsx   плеер скачанного файла
