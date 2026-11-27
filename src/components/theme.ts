@@ -7,4 +7,5 @@ export const colors = {
   accent: '#d62d20',
   link: '#1a64d6',
   chipActive: '#111111',
+  activeBg: '#fdeceb',
 };

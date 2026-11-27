@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, type AiConfig } from './ai';
+import * as SecureStore from './secureStore';
 import type { ChannelInfo } from './types';
 
 export type Settings = AiConfig & {

@@ -59,18 +59,42 @@ export function segmentsFor(segments: TranscriptSegment[], ch: Chapter): Transcr
   return segments.filter((s) => s.start >= ch.start - 0.5 && s.start < ch.end);
 }
 
+export type TranscriptLine = { start: number; text: string };
+
+/** Groups caption segments into lines that each span at least `everySec` seconds. */
+export function transcriptLines(segments: TranscriptSegment[], everySec: number): TranscriptLine[] {
+  const lines: TranscriptLine[] = [];
+  for (const s of segments) {
+    const last = lines[lines.length - 1];
+    if (!last || s.start - last.start >= everySec) lines.push({ start: s.start, text: s.text });
+    else last.text += ` ${s.text}`;
+  }
+  return lines;
+}
+
+/** Index of the line being spoken at `time`, -1 before the first one. */
+export function lineIndexAt(lines: TranscriptLine[], time: number): number {
+  let lo = 0;
+  let hi = lines.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    // Half a second of slack: the player may land slightly before the requested time after a seek.
+    if (lines[mid].start <= time + 0.5) {
+      found = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  return found;
+}
+
 /** Compact transcript text with a [m:ss] marker roughly every 30s (saves tokens, keeps timecodes). */
 export function transcriptToText(segments: TranscriptSegment[], everySec = 30): string {
-  let out = '';
-  let lastMark = -Infinity;
-  for (const s of segments) {
-    if (s.start - lastMark >= everySec) {
-      const m = Math.floor(s.start / 60);
-      const sec = String(Math.floor(s.start % 60)).padStart(2, '0');
-      out += `${out ? '\n' : ''}[${m}:${sec}] `;
-      lastMark = s.start;
-    } else out += ' ';
-    out += s.text;
-  }
-  return out;
+  return transcriptLines(segments, everySec)
+    .map((l) => {
+      const m = Math.floor(l.start / 60);
+      const sec = String(Math.floor(l.start % 60)).padStart(2, '0');
+      return `[${m}:${sec}] ${l.text}`;
+    })
+    .join('\n');
 }
