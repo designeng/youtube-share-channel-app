@@ -11,7 +11,7 @@ test.describe('bottom mode bar', () => {
       await page.getByTestId(`mode-${mode}`).click();
       await expect(page.getByTestId(`mode-${mode}`)).toHaveAttribute(...SELECTED);
       await expect(page.getByTestId(`panel-${mode}`)).toBeVisible();
-      await expect(page.locator('[data-testid^="panel-"]')).toHaveCount(1);
+      await expect(page.locator('[data-testid^="panel-"]').filter({ visible: true })).toHaveCount(1);
       await expect(page.getByTestId('fake-player')).toBeInViewport();
     }
   });
@@ -84,6 +84,37 @@ test.describe('transcript sync', () => {
       await expect(row).toBeInViewport({ ratio: 1 });
       await expect(page.locator('[data-testid^="transcript-line-"][aria-selected="true"]')).toHaveCount(1);
     }
+  });
+
+  test('keeps its place while another mode is open', async ({ page }) => {
+    await page.getByTestId('mode-transcript').click();
+    await page.getByTestId('transcript-list').hover();
+    await page.mouse.wheel(0, 2000);
+    await expect(page.getByTestId('transcript-line-0')).not.toBeInViewport();
+    const list = page.getByTestId('transcript-list');
+    const offset = await list.evaluate((el) => el.scrollTop);
+
+    await page.getByTestId('mode-chapters').click();
+    await expect(page.getByTestId('panel-transcript')).toBeHidden();
+    await page.getByTestId('mode-transcript').click();
+    expect(await list.evaluate((el) => el.scrollTop)).toBe(offset);
+  });
+
+  test('follows playback while another mode is open', async ({ page }) => {
+    await page.getByTestId('mode-transcript').click();
+    await expect(page.getByTestId('transcript-line-0')).toBeInViewport();
+    await page.getByTestId('mode-chapters').click();
+    await playTo(page, 455);
+    await expect(page.getByTestId('transcript-line-45')).toHaveAttribute(...SELECTED);
+    await expect(page.getByTestId('transcript-line-45')).toBeAttached();
+    // Already there on return, without scrolling from the start.
+    await page.waitForTimeout(1000);
+    const list = page.getByTestId('transcript-list');
+    const offset = await list.evaluate((el) => el.scrollTop);
+    expect(offset).toBeGreaterThan(0);
+    await page.getByTestId('mode-transcript').click();
+    await expect(page.getByTestId('transcript-line-45')).toBeInViewport({ ratio: 1 });
+    expect(await list.evaluate((el) => el.scrollTop)).toBe(offset);
   });
 
   test('opens already positioned at the current moment', async ({ page }) => {
