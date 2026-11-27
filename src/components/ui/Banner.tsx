@@ -1,8 +1,10 @@
 /** Inline notice above the content it is about. */
 import { StyleSheet, Text, View } from 'react-native';
+import { useStrings } from '../../lib/i18n';
 import { radius, space, useColors } from '../theme';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
+import { IconButton } from './IconButton';
 
 type Tone = 'info' | 'warn' | 'error';
 
@@ -11,10 +13,13 @@ type Props = {
   text: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** shows a close button */
+  onDismiss?: () => void;
 };
 
-export function Banner({ tone = 'info', text, actionLabel, onAction }: Props) {
+export function Banner({ tone = 'info', text, actionLabel, onAction, onDismiss }: Props) {
   const colors = useColors();
+  const s = useStrings();
   const { bg, fg, icon } = (
     {
       info: { bg: colors.surface, fg: colors.muted, icon: 'info' },
@@ -29,6 +34,7 @@ export function Banner({ tone = 'info', text, actionLabel, onAction }: Props) {
         <Text style={[styles.text, { color: fg }]}>{text}</Text>
         {actionLabel && onAction && <Button small variant="ghost" label={actionLabel} onPress={onAction} style={styles.action} />}
       </View>
+      {onDismiss && <IconButton icon="close" label={s.common.close} size={18} color={fg} onPress={onDismiss} />}
     </View>
   );
 }

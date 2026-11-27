@@ -41,7 +41,7 @@ function buildPrompt({ video, chapters, transcript, target }: ReviewInput, cfg: 
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function withRetry<T>(fn: () => Promise<T>, onWait?: (sec: number) => void): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, onWait?: (sec: number) => void, signal?: AbortSignal): Promise<T> {
   // Free tiers have low RPM limits: retry 429/503 with backoff.
   const delays = [8, 20, 45];
   for (let i = 0; ; i++) {
@@ -52,6 +52,7 @@ async function withRetry<T>(fn: () => Promise<T>, onWait?: (sec: number) => void
       const wait = e.retryAfter ?? delays[i];
       onWait?.(wait);
       await sleep(wait * 1000);
+      if (signal?.aborted) throw e;
     }
   }
 }
@@ -62,11 +63,12 @@ class AiError extends Error {
   }
 }
 
-async function gemini(cfg: AiConfig, system: string, parts: Part[]): Promise<string> {
+async function gemini(cfg: AiConfig, system: string, parts: Part[], signal?: AbortSignal): Promise<string> {
   if (!cfg.geminiKey) throw new AiError(t().ai.noGeminiKey);
   const model = cfg.geminiModel.replace(/^models\//, '');
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
+    signal,
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.geminiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
@@ -84,10 +86,11 @@ async function gemini(cfg: AiConfig, system: string, parts: Part[]): Promise<str
   return text;
 }
 
-async function openrouter(cfg: AiConfig, system: string, user: string): Promise<string> {
+async function openrouter(cfg: AiConfig, system: string, user: string, signal?: AbortSignal): Promise<string> {
   if (!cfg.openrouterKey) throw new AiError(t().ai.noOpenRouterKey);
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${cfg.openrouterKey}`,
@@ -143,6 +146,21 @@ export async function generateReview(
   return withRetry(
     () => openrouter(cfg, system, `${task}\n\n${prompts.transcriptIntro}\n${transcriptText}`),
     onWait,
+  );
+}
+
+/** One plain text request to the chosen provider, waiting out its rate limit. */
+export function completeText(
+  cfg: AiConfig,
+  system: string,
+  user: string,
+  { signal, onStatus }: { signal?: AbortSignal; onStatus?: (s: string) => void } = {},
+) {
+  return withRetry(
+    () =>
+      cfg.provider === 'gemini' ? gemini(cfg, system, [{ text: user }], signal) : openrouter(cfg, system, user, signal),
+    (sec) => onStatus?.(t().ai.rateLimited(sec)),
+    signal,
   );
 }
 

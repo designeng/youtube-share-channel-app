@@ -3,16 +3,17 @@
  * is closed. Downloads need the app to stay alive: closing it drops them.
  */
 import { useMemo, useSyncExternalStore } from 'react';
+import { getTranslation } from '../aiTranslate';
 import { videoParts } from '../chapters';
 import { confirm } from '../confirm';
 import { formatBytes } from '../format';
 import { t } from '../i18n';
 import { getCachedReview } from '../settings';
-import type { VideoDetails } from '../types';
+import type { Transcript, VideoDetails } from '../types';
 import { getNetworkKind, onNetworkChange } from './network';
 import * as store from './store';
 import { getVideoStream } from './stream';
-import { fetchOfflineTranscripts } from './transcripts';
+import { fetchOfflineTranscripts, transcriptLangOf } from './transcripts';
 import type { DownloadRecord, SavedReviews } from './types';
 
 /** fetch has no timeout of its own on Android, and a request caught by a network switch may never end. */
@@ -154,6 +155,11 @@ export async function startDownload(video: VideoDetails, { wifiOnly, langs, revi
     if (controller.signal.aborted) throw new Error('aborted');
     if (controllers.get(id) !== controller) return;
     store.writeRecord({ video, bytes, quality: stream.quality, savedAt: new Date().toISOString(), ...subtitles });
+    // Translations already made by AI go along.
+    for (const lang of subtitles.missingLangs) {
+      const translation = getTranslation(id, lang);
+      if (translation) addTranscript(id, translation);
+    }
     await keepCachedReviews(video, reviewTtlMin);
     setActive(id, undefined);
     libraryChanged();
@@ -211,6 +217,20 @@ export function deleteDownload(videoId: string) {
 
 export function deleteAllDownloads() {
   for (const r of store.listRecords()) store.removeRecord(r.video.id);
+  libraryChanged();
+}
+
+/** Keeps a translation made by AI with the downloaded copy. Does nothing for other videos. */
+export function addTranscript(videoId: string, transcript: Transcript) {
+  const record = store.readRecord(videoId);
+  // The first saved transcript must stay the original one.
+  if (!record?.transcripts.length) return;
+  const lang = transcriptLangOf(transcript);
+  store.writeRecord({
+    ...record,
+    transcripts: [...record.transcripts.filter((x) => transcriptLangOf(x) !== lang), transcript],
+    missingLangs: record.missingLangs.filter((l) => l !== lang),
+  });
   libraryChanged();
 }
 

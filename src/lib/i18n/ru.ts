@@ -157,6 +157,10 @@ export const ru: Strings = {
     translationLimited:
       'YouTube ограничил автоперевод субтитров (лимит запросов) — показан оригинал. AI-обзор всё равно будет на выбранном языке.',
     loading: 'Загружаю субтитры…',
+    noLanguage: (lang) => `Нет субтитров на «${lang}» — показан оригинал.`,
+    translateWithAi: 'Перевести с помощью AI',
+    translating: (lang, part, total) => `Перевожу → ${lang}: часть ${part} из ${total}…`,
+    badTranslation: 'AI вернул неполный перевод. Повторите или выберите другую модель.',
     toCurrent: (time) => `К текущему моменту · ${time}`,
     refused: 'YouTube отказал в выдаче субтитров (возможно, изменился внутренний API).',
   },
