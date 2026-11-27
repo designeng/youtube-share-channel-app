@@ -3,6 +3,7 @@
  * Costs used here: channels.list = 1, playlistItems.list = 1, videos.list = 1 per call (50 items).
  * search.list (100 units) is deliberately avoided.
  */
+import { t } from './i18n';
 import type { ChannelRef } from './parseUrl';
 import { parseIsoDuration } from './format';
 import type { ChannelInfo, VideoDetails, VideoItem } from './types';
@@ -16,7 +17,7 @@ export class YouTubeApiError extends Error {
 }
 
 async function call<T = any>(path: string, params: Record<string, string>, key: string): Promise<T> {
-  if (!key) throw new YouTubeApiError('Не задан YouTube API key (Настройки).', 0, 'noKey');
+  if (!key) throw new YouTubeApiError(t().youtube.noKey, 0, 'noKey');
   const qs = new URLSearchParams({ ...params, key }).toString();
   const res = await fetch(`${API}/${path}?${qs}`);
   const json = await res.json().catch(() => ({}));
@@ -24,7 +25,7 @@ async function call<T = any>(path: string, params: Record<string, string>, key: 
     const reason = json?.error?.errors?.[0]?.reason;
     const msg =
       reason === 'quotaExceeded'
-        ? 'Дневная квота YouTube API исчерпана (сбрасывается в полночь по тихоокеанскому времени).'
+        ? t().youtube.quota
         : json?.error?.message ?? `YouTube API: HTTP ${res.status}`;
     throw new YouTubeApiError(msg, res.status, reason);
   }
@@ -60,21 +61,21 @@ export async function resolveChannel(ref: ChannelRef, key: string): Promise<Chan
       break;
     case 'custom': {
       const id = await scrapeChannelId(ref.url);
-      if (!id) throw new YouTubeApiError('Не удалось определить канал по ссылке.');
+      if (!id) throw new YouTubeApiError(t().youtube.unresolved);
       params.id = id;
       break;
     }
     case 'video': {
       const v = await call('videos', { part: 'snippet', id: ref.value }, key);
       const channelId = v.items?.[0]?.snippet?.channelId;
-      if (!channelId) throw new YouTubeApiError('Видео не найдено.');
+      if (!channelId) throw new YouTubeApiError(t().youtube.videoNotFound);
       params.id = channelId;
       break;
     }
   }
   const json = await call('channels', params, key);
   const c = json.items?.[0];
-  if (!c) throw new YouTubeApiError('Канал не найден.');
+  if (!c) throw new YouTubeApiError(t().youtube.channelNotFound);
   return {
     id: c.id,
     title: c.snippet.title,
@@ -145,6 +146,6 @@ async function getVideosBasic(ids: string[], key: string): Promise<VideoDetails[
 
 export async function getVideo(id: string, key: string): Promise<VideoDetails> {
   const [v] = await getVideosBasic([id], key);
-  if (!v) throw new YouTubeApiError('Видео не найдено или недоступно.');
+  if (!v) throw new YouTubeApiError(t().youtube.videoUnavailable);
   return v;
 }

@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet } from 'react-native';
-import { colors, radius, TOUCH } from '../theme';
+import { Pressable } from 'react-native';
+import { radius, themed, TOUCH } from '../theme';
 import { Icon, type IconName } from './Icon';
 
 type Props = {
@@ -12,7 +12,8 @@ type Props = {
   testID?: string;
 };
 
-export function IconButton({ icon, label, onPress, color = colors.text, size = 22, testID }: Props) {
+export function IconButton({ icon, label, onPress, color, size = 22, testID }: Props) {
+  const styles = useStyles();
   return (
     <Pressable
       testID={testID}
@@ -27,7 +28,7 @@ export function IconButton({ icon, label, onPress, color = colors.text, size = 2
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   button: { width: TOUCH - 4, height: TOUCH - 4, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   pressed: { backgroundColor: colors.surfacePressed },
-});
+}));

@@ -1,15 +1,18 @@
 /** A timecode with its title and the button that asks AI about it. */
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { formatTime } from '../../lib/format';
 import type { Chapter } from '../../lib/types';
-import { colors, radius, space, TOUCH, type } from '../theme';
+import { radius, space, themed, TOUCH, useColors, useType } from '../theme';
 import { Icon, type IconName } from '../ui/Icon';
-import { shared } from './styles';
+import { useShared } from './styles';
 
 type RowProps = { chapter: Chapter; active: boolean; onSeek: (sec: number) => void; children: ReactNode };
 
 export function ChapterRow({ chapter, active, onSeek, children }: RowProps) {
+  const type = useType();
+  const shared = useShared();
+  const styles = useStyles();
   return (
     <View style={[styles.row, active && styles.rowActive]}>
       <Pressable
@@ -37,6 +40,8 @@ type AiButtonProps = {
 };
 
 export function AiButton({ testID, label, onPress, done, loading, icon }: AiButtonProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const color = done ? colors.onPrimary : colors.text;
   return (
     <Pressable
@@ -60,7 +65,7 @@ export function AiButton({ testID, label, onPress, done, loading, icon }: AiButt
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -98,4 +103,4 @@ const styles = StyleSheet.create({
   },
   aiDone: { backgroundColor: colors.primary, borderColor: colors.primary },
   aiText: { fontSize: 12, fontWeight: '700' },
-});
+}));

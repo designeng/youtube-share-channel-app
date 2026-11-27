@@ -1,20 +1,24 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius } from '../theme';
+import { useStrings } from '../../lib/i18n';
+import { radius, themed, useColors } from '../theme';
 import { Icon, type IconName } from '../ui/Icon';
 
 export type Mode = 'chapters' | 'transcript' | 'ai' | 'about';
 
-const MODES: { key: Mode; icon: IconName; label: string }[] = [
-  { key: 'chapters', icon: 'chapters', label: 'Таймкоды' },
-  { key: 'transcript', icon: 'transcript', label: 'Транскрипт' },
-  { key: 'ai', icon: 'ai', label: 'AI-обзор' },
-  { key: 'about', icon: 'info', label: 'Описание' },
+const MODES: { key: Mode; icon: IconName }[] = [
+  { key: 'chapters', icon: 'chapters' },
+  { key: 'transcript', icon: 'transcript' },
+  { key: 'ai', icon: 'ai' },
+  { key: 'about', icon: 'info' },
 ];
 
 /** Bottom bar switching what is shown under the player. */
 export function ModeBar({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const styles = useStyles();
+  const s = useStrings();
   return (
     <View
       role="tablist"
@@ -22,13 +26,14 @@ export function ModeBar({ mode, onChange }: { mode: Mode; onChange: (m: Mode) =>
     >
       {MODES.map((m) => {
         const active = m.key === mode;
+        const label = s.video.modes[m.key];
         return (
           <Pressable
             key={m.key}
             testID={`mode-${m.key}`}
             role="tab"
             aria-selected={active}
-            aria-label={m.label}
+            aria-label={label}
             style={({ pressed }) => [styles.item, pressed && styles.pressed]}
             onPress={() => onChange(m.key)}
           >
@@ -36,7 +41,7 @@ export function ModeBar({ mode, onChange }: { mode: Mode; onChange: (m: Mode) =>
               <Icon name={m.icon} size={22} color={active ? colors.text : colors.muted} />
             </View>
             <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-              {m.label}
+              {label}
             </Text>
           </Pressable>
         );
@@ -45,7 +50,7 @@ export function ModeBar({ mode, onChange }: { mode: Mode; onChange: (m: Mode) =>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   bar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.bg },
   item: { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 6, gap: 3, minHeight: 58 },
   pressed: { opacity: 0.6 },
@@ -53,4 +58,4 @@ const styles = StyleSheet.create({
   iconActive: { backgroundColor: colors.surfacePressed },
   label: { fontSize: 11, color: colors.muted, fontWeight: '600' },
   labelActive: { color: colors.text, fontWeight: '700' },
-});
+}));

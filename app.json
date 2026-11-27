@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/ic.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.designeng.channelviewer"
@@ -41,7 +41,15 @@
         }
       ],
       "expo-video",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["en", "ru"],
+          "supportsRTL": false
+        }
+      ],
+      "expo-system-ui"
     ],
     "scheme": "channelviewer",
     "experiments": {

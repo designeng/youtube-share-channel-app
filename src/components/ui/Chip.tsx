@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radius, space } from '../theme';
+import { Pressable, Text } from 'react-native';
+import { radius, space, themed, useColors } from '../theme';
 import { Icon } from './Icon';
 
 type Props = {
@@ -11,6 +11,8 @@ type Props = {
 };
 
 export function Chip({ label, active, onPress, role = 'button' }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const checkbox = role === 'checkbox';
   return (
     <Pressable
@@ -27,7 +29,7 @@ export function Chip({ label, active, onPress, role = 'button' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -43,4 +45,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.65 },
   text: { fontSize: 13, fontWeight: '600', color: colors.text },
   textActive: { color: colors.onPrimary },
-});
+}));

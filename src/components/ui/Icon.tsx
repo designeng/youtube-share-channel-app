@@ -1,7 +1,7 @@
 /** Platform symbols (SF Symbols on iOS, Material Symbols on Android and web) under app-level names. */
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import type { ColorValue } from 'react-native';
-import { colors } from '../theme';
+import { useColors } from '../theme';
 
 type Names = Exclude<SymbolViewProps['name'], string>;
 
@@ -41,6 +41,7 @@ const ICONS = {
 export type IconName = keyof typeof ICONS;
 
 /** Decorative: the control around it carries the accessible label. */
-export function Icon({ name, size = 20, color = colors.text }: { name: IconName; size?: number; color?: ColorValue }) {
-  return <SymbolView name={ICONS[name]} size={size} tintColor={color} />;
+export function Icon({ name, size = 20, color }: { name: IconName; size?: number; color?: ColorValue }) {
+  const colors = useColors();
+  return <SymbolView name={ICONS[name]} size={size} tintColor={color ?? colors.text} />;
 }

@@ -8,20 +8,20 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   type FlatListInstance,
 } from 'react-native';
 import { lineIndexAt, transcriptLines, type TranscriptLine } from '../../lib/chapters';
 import { errorText, formatTime } from '../../lib/format';
+import { useStrings } from '../../lib/i18n';
 import type { Transcript } from '../../lib/types';
-import { colors, radius, space, TOUCH, type } from '../theme';
+import { radius, space, themed, TOUCH, useColors, useType } from '../theme';
 import { Banner } from '../ui/Banner';
 import { Chip } from '../ui/Chip';
 import { Icon } from '../ui/Icon';
 import { StateView } from '../ui/StateView';
-import { shared } from './styles';
+import { useShared } from './styles';
 
 export type TrackChoice = { languageCode: string; tlang?: string };
 export type TrackOption = { label: string; choice: TrackChoice };
@@ -56,6 +56,9 @@ const Line = memo(function Line({
   active: boolean;
   onPress: (line: TranscriptLine) => void;
 }) {
+  const type = useType();
+  const shared = useShared();
+  const styles = useStyles();
   return (
     <Pressable
       testID={`transcript-line-${index}`}
@@ -71,6 +74,10 @@ const Line = memo(function Line({
 });
 
 export function TranscriptPanel({ transcript, loading, error, options, choice, time, onChoose, onSeek, onRetry }: Props) {
+  const colors = useColors();
+  const shared = useShared();
+  const styles = useStyles();
+  const s = useStrings();
   const list = useRef<FlatListInstance>(null);
   const [follow, setFollow] = useState(true);
   const following = useRef(follow);
@@ -137,16 +144,16 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
         <View style={styles.notice}>
           <Banner
             tone="warn"
-            text="YouTube ограничил автоперевод субтитров (лимит запросов) — показан оригинал. AI-обзор всё равно будет на выбранном языке."
+            text={s.transcript.translationLimited}
           />
         </View>
       )}
       {error && !loading && (
         <View style={styles.notice}>
-          <Banner tone="error" text={errorText(error)} actionLabel={onRetry ? 'Повторить' : undefined} onAction={onRetry} />
+          <Banner tone="error" text={errorText(error)} actionLabel={onRetry ? s.common.retry : undefined} onAction={onRetry} />
         </View>
       )}
-      {(loading || (!transcript && !error)) && <StateView loading message="Загружаю субтитры…" />}
+      {(loading || (!transcript && !error)) && <StateView loading message={s.transcript.loading} />}
       {visible && (
         <View style={styles.listWrap}>
           <FlatList
@@ -167,7 +174,7 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
           {!follow && current >= 0 && (
             <Pressable testID="transcript-follow" role="button" style={styles.followBtn} onPress={() => setFollow(true)}>
               <Icon name="follow" size={18} color={colors.onPrimary} />
-              <Text style={styles.followText}>К текущему моменту · {formatTime(time)}</Text>
+              <Text style={styles.followText}>{s.transcript.toCurrent(formatTime(time))}</Text>
             </Pressable>
           )}
         </View>
@@ -176,7 +183,7 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   panel: { flex: 1 },
   chipsRow: { flexGrow: 0 },
   notice: { paddingHorizontal: space.md, paddingVertical: space.xs },
@@ -207,4 +214,4 @@ const styles = StyleSheet.create({
     boxShadow: '0 4px 12px rgba(0,0,0,0.22)',
   },
   followText: { color: colors.onPrimary, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },
-});
+}));

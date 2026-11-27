@@ -1,7 +1,8 @@
 /** Text field with an optional leading icon and trailing control (clear, show password…). */
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
-import { colors, radius, space, TOUCH } from '../theme';
+import { TextInput, View, type TextInputProps } from 'react-native';
+import { useStrings } from '../../lib/i18n';
+import { radius, space, themed, TOUCH, useColors } from '../theme';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
 
@@ -15,6 +16,9 @@ type Props = TextInputProps & {
 
 export function Input({ icon, onClear, trailing, invalid, style, onFocus, onBlur, ...props }: Props) {
   const [focused, setFocused] = useState(false);
+  const colors = useColors();
+  const styles = useStyles();
+  const s = useStrings();
   return (
     <View style={[styles.box, focused && styles.focused, invalid && styles.invalid]}>
       {icon && <Icon name={icon} size={18} color={colors.faint} />}
@@ -33,13 +37,13 @@ export function Input({ icon, onClear, trailing, invalid, style, onFocus, onBlur
         }}
         style={[styles.input, style]}
       />
-      {onClear && !!props.value && <IconButton icon="close" label="Очистить" size={18} color={colors.muted} onPress={onClear} />}
+      {onClear && !!props.value && <IconButton icon="close" label={s.common.clear} size={18} color={colors.muted} onPress={onClear} />}
       {trailing}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -56,4 +60,4 @@ const styles = StyleSheet.create({
   invalid: { borderColor: colors.danger },
   // The box shows focus, so the browser outline is redundant.
   input: { flex: 1, minWidth: 0, fontSize: 15, color: colors.text, paddingVertical: space.sm, outlineColor: 'transparent' },
-});
+}));

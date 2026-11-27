@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, type AiConfig } from './ai';
+import { getLanguage } from './i18n';
 import * as SecureStore from './secureStore';
 import type { ChannelInfo } from './types';
 
@@ -18,19 +19,20 @@ export type Settings = AiConfig & {
 
 const SECRET_KEYS = ['youtubeKey', 'geminiKey', 'openrouterKey'] as const;
 
-const DEFAULTS: Settings = {
+/** Until the user picks otherwise, subtitles and AI reviews follow the system language. */
+const defaults = (): Settings => ({
   youtubeKey: '',
   provider: 'gemini',
   geminiKey: '',
   geminiModel: DEFAULT_GEMINI_MODEL,
   openrouterKey: '',
   openrouterModel: DEFAULT_OPENROUTER_MODEL,
-  outputLanguage: 'русский',
-  transcriptLang: 'ru',
+  outputLanguage: getLanguage() === 'ru' ? 'русский' : 'English',
+  transcriptLang: getLanguage(),
   cacheTtlMin: 60,
   wifiOnly: true,
   offlineLangs: ['ru', 'en'],
-};
+});
 
 const PREFS_KEY = 'prefs.v1';
 const RECENT_KEY = 'recentChannels.v1';
@@ -44,13 +46,13 @@ type Ctx = {
 const SettingsContext = createContext<Ctx | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(DEFAULTS);
+  const [settings, setSettings] = useState<Settings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const ref = useRef(settings);
 
   useEffect(() => {
     (async () => {
-      const next = { ...DEFAULTS };
+      const next = defaults();
       try {
         Object.assign(next, JSON.parse((await AsyncStorage.getItem(PREFS_KEY)) ?? '{}'));
         for (const k of SECRET_KEYS) next[k] = (await SecureStore.getItemAsync(k)) ?? '';

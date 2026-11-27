@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, type } from '../../components/theme';
+import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
+import { radius, space, themed, useColors, useType } from '../../components/theme';
 import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
 import { Chip } from '../../components/ui/Chip';
@@ -13,24 +13,14 @@ import { Segmented } from '../../components/ui/Segmented';
 import { StateView } from '../../components/ui/StateView';
 import { VideoRow, VideoRowSkeleton } from '../../components/VideoRow';
 import { errorText, formatCount } from '../../lib/format';
+import { useStrings } from '../../lib/i18n';
 import { addRecentChannel, useSettings } from '../../lib/settings';
 import type { ChannelInfo, VideoItem } from '../../lib/types';
 import { listUploads, resolveChannel, uploadsPlaylistFor, type UploadsKind } from '../../lib/youtubeApi';
 
 type SortKey = 'new' | 'old' | 'views' | 'title' | 'long';
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'new', label: 'Новые' },
-  { key: 'old', label: 'Старые' },
-  { key: 'views', label: 'Популярные' },
-  { key: 'long', label: 'Длинные' },
-  { key: 'title', label: 'А–Я' },
-];
-const KINDS: { key: UploadsKind; label: string }[] = [
-  { key: 'videos', label: 'Видео' },
-  { key: 'shorts', label: 'Shorts' },
-  { key: 'live', label: 'Трансляции' },
-  { key: 'all', label: 'Все' },
-];
+const SORTS: SortKey[] = ['new', 'old', 'views', 'long', 'title'];
+const KINDS: UploadsKind[] = ['videos', 'shorts', 'live', 'all'];
 /** Safety cap for "load all": 40 pages × 50 = 2000 videos ≈ 80 quota units. */
 const MAX_PAGES = 40;
 
@@ -38,6 +28,10 @@ export default function ChannelScreen() {
   const { id, title } = useLocalSearchParams<{ id: string; title?: string }>();
   const { settings, loaded } = useSettings();
   const insets = useScreenInsets();
+  const colors = useColors();
+  const type = useType();
+  const styles = useStyles();
+  const s = useStrings();
   const key = settings.youtubeKey;
 
   const [channel, setChannel] = useState<ChannelInfo>();
@@ -173,8 +167,8 @@ export default function ChannelScreen() {
 
   const errorActions = error && (
     <>
-      {/key|ключ/i.test(error) && <Button icon="settings" label="Открыть настройки" onPress={() => router.push('/settings')} />}
-      <Button variant="secondary" icon="refresh" label="Повторить" onPress={retry} />
+      {/key|ключ/i.test(error) && <Button icon="settings" label={s.common.openSettings} onPress={() => router.push('/settings')} />}
+      <Button variant="secondary" icon="refresh" label={s.common.retry} onPress={retry} />
     </>
   );
 
@@ -188,7 +182,7 @@ export default function ChannelScreen() {
               {channel.title}
             </Text>
             <Text style={type.caption}>
-              {[channel.handle, channel.videoCount != null && `${formatCount(channel.videoCount)} видео`]
+              {[channel.handle, channel.videoCount != null && s.channel.videoCount(formatCount(channel.videoCount))]
                 .filter(Boolean)
                 .join(' · ')}
             </Text>
@@ -196,7 +190,7 @@ export default function ChannelScreen() {
         </View>
       )}
       <View style={styles.pad}>
-        <Segmented options={KINDS} value={kind} onChange={selectKind} />
+        <Segmented options={KINDS.map((key) => ({ key, label: s.channel.kinds[key] }))} value={kind} onChange={selectKind} />
       </View>
       <View style={styles.pad}>
         <Input
@@ -204,38 +198,37 @@ export default function ChannelScreen() {
           value={query}
           onChangeText={setQuery}
           onClear={() => setQuery('')}
-          placeholder="Поиск по названию"
+          placeholder={s.channel.searchPlaceholder}
           returnKeyType="search"
         />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sorts}>
-        <View aria-label="Сортировка">
+        <View aria-label={s.channel.sortLabel}>
           <Icon name="sort" size={18} color={colors.muted} />
         </View>
-        {SORTS.map((s) => (
-          <Chip key={s.key} label={s.label} active={sort === s.key} onPress={() => setSort(s.key)} />
+        {SORTS.map((key) => (
+          <Chip key={key} label={s.channel.sorts[key]} active={sort === key} onPress={() => setSort(key)} />
         ))}
       </ScrollView>
       {items.length > 0 && (
         <View style={styles.status}>
           <Text style={[type.caption, styles.fill]}>
-            {query.trim() ? `Найдено ${visible.length} · ` : ''}
-            Загружено {items.length}
-            {total != null ? ` из ${total}` : ''}
+            {query.trim() ? `${s.channel.found(visible.length)} · ` : ''}
+            {s.channel.loaded(items.length, total)}
           </Text>
           {nextToken && (
-            <Button small variant="ghost" label={loadingAll ? 'Загружаю…' : 'Загрузить все'} onPress={loadAll} disabled={loadingAll} />
+            <Button small variant="ghost" label={loadingAll ? s.channel.loadingAll : s.channel.loadAll} onPress={loadAll} disabled={loadingAll} />
           )}
         </View>
       )}
       {needsAllHint && !loadingAll && (
         <View style={styles.pad}>
-          <Banner text="Сортировка и поиск работают по загруженным видео — нажмите «Загрузить все»." />
+          <Banner text={s.channel.needsAllHint} />
         </View>
       )}
       {error && items.length > 0 && (
         <View style={styles.pad}>
-          <Banner tone="error" text={errorText(error)} actionLabel="Повторить" onAction={retry} />
+          <Banner tone="error" text={errorText(error)} actionLabel={s.common.retry} onAction={retry} />
         </View>
       )}
     </View>
@@ -249,15 +242,15 @@ export default function ChannelScreen() {
         ))}
       </>
     ) : error ? (
-      <StateView icon="alert" tone="error" title="Не удалось загрузить видео" message={errorText(error)}>
+      <StateView icon="alert" tone="error" title={s.channel.loadFailed} message={errorText(error)}>
         {errorActions}
       </StateView>
     ) : query.trim() ? (
-      <StateView icon="search" title="Ничего не найдено" message="Среди загруженных видео таких названий нет.">
-        <Button variant="secondary" label="Сбросить поиск" onPress={() => setQuery('')} />
+      <StateView icon="search" title={s.channel.nothingFound} message={s.channel.nothingFoundMessage}>
+        <Button variant="secondary" label={s.channel.resetSearch} onPress={() => setQuery('')} />
       </StateView>
     ) : (
-      <StateView icon="video" title="Здесь пока пусто" message="В этом разделе канала нет видео." />
+      <StateView icon="video" title={s.channel.empty} message={s.channel.emptyMessage} />
     );
 
   return (
@@ -286,7 +279,7 @@ export default function ChannelScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   fill: { flex: 1 },
   header: { gap: space.md, paddingTop: space.sm, paddingBottom: space.sm },
   pad: { paddingHorizontal: space.lg },
@@ -295,4 +288,4 @@ const styles = StyleSheet.create({
   sorts: { alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg },
   status: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: 28 },
   more: { margin: space.lg },
-});
+}));

@@ -4,7 +4,7 @@
  */
 import { Fragment, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from './theme';
+import { themed } from './theme';
 
 const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|\[?\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b\]?)/g;
 
@@ -16,6 +16,7 @@ function toSec(ts: string) {
 }
 
 export function InlineText({ text, onTime }: { text: string; onTime?: (sec: number) => void }) {
+  const styles = useStyles();
   const parts = text.split(INLINE).filter((p) => p !== '');
   return (
     <>
@@ -51,6 +52,7 @@ export function InlineText({ text, onTime }: { text: string; onTime?: (sec: numb
 }
 
 export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number) => void }) {
+  const styles = useStyles();
   const blocks: ReactNode[] = [];
   const lines = text.replace(/\r/g, '').split('\n');
   let para: string[] = [];
@@ -97,7 +99,7 @@ export function Markdown({ text, onTime }: { text: string; onTime?: (sec: number
   return <View style={{ gap: 6 }}>{blocks}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = themed((colors) => ({
   p: { fontSize: 15, lineHeight: 22, color: colors.text },
   h: { color: colors.text, fontWeight: '700', marginTop: 8 },
   h1: { fontSize: 18 },
@@ -110,4 +112,4 @@ const styles = StyleSheet.create({
   code: { fontFamily: 'Courier', backgroundColor: colors.border },
   time: { color: colors.link, fontWeight: '600' },
   hr: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 6 },
-});
+}));
