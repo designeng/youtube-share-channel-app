@@ -71,6 +71,7 @@ export default function VideoScreen() {
   const [mode, setMode] = useState<Mode>('chapters');
   const [aiFocus, setAiFocus] = useState<number>();
   const [transcriptOpened, setTranscriptOpened] = useState(false);
+  const [aiOpened, setAiOpened] = useState(false);
 
   const [info, setInfo] = useState<TranscriptInfo>();
   const [choice, setChoice] = useState<TrackChoice>();
@@ -228,6 +229,7 @@ export default function VideoScreen() {
   // "AI" on a timecode: switch to the review mode and show (or generate) that chapter.
   const reviewFromChapters = (index: number) => {
     setAiFocus(index);
+    setAiOpened(true);
     setMode('ai');
     if (reviews[String(index)]?.text) patchReview(String(index), { open: true });
     else review(index);
@@ -236,6 +238,7 @@ export default function VideoScreen() {
   const changeMode = (m: Mode) => {
     setAiFocus(undefined);
     if (m === 'transcript') setTranscriptOpened(true);
+    if (m === 'ai') setAiOpened(true);
     setMode(m);
   };
 
@@ -369,19 +372,6 @@ export default function VideoScreen() {
               </ScrollView>
             ) : !video ? (
               <StateView loading message={s.video.loading} />
-            ) : mode === 'ai' ? (
-              <AiPanel
-                chapters={parts}
-                authored={hasChapters}
-                currentIndex={currentIdx}
-                time={time}
-                reviews={reviews}
-                runningAll={runningAll}
-                focusIndex={aiFocus}
-                onRunAll={runAllChapters}
-                onReview={review}
-                onSeek={seek}
-              />
             ) : mode === 'about' ? (
               <AboutPanel video={video} onSeek={seek} />
             ) : null}
@@ -396,6 +386,22 @@ export default function VideoScreen() {
                   reviews={reviews}
                   onSeek={seek}
                   onReview={reviewFromChapters}
+                />
+              </Layer>
+            )}
+            {video && aiOpened && (
+              <Layer active={mode === 'ai'}>
+                <AiPanel
+                  chapters={parts}
+                  authored={hasChapters}
+                  currentIndex={currentIdx}
+                  time={time}
+                  reviews={reviews}
+                  runningAll={runningAll}
+                  focusIndex={aiFocus}
+                  onRunAll={runAllChapters}
+                  onReview={review}
+                  onSeek={seek}
                 />
               </Layer>
             )}

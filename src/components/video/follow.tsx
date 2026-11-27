@@ -50,6 +50,16 @@ export function useFollowScroll(targetKey: string | undefined, initialFollow = t
 
   const resume = useCallback(() => setFollow(true), []);
 
+  /** Stops following and puts `node` at the top. */
+  const showAtTop = useCallback(
+    (node: ViewInstance) => {
+      stopFollowing();
+      const content = contentRef.current;
+      if (content) node.measureLayout(content, (_x, y) => scrollRef.current?.scrollTo({ y, animated: false }));
+    },
+    [stopFollowing],
+  );
+
   // react-native-web does not emit drag events for wheel / touch scrolling.
   const webScrollProps: object = Platform.OS === 'web' ? { onWheel: stopFollowing, onTouchMove: stopFollowing } : {};
 
@@ -57,6 +67,7 @@ export function useFollowScroll(targetKey: string | undefined, initialFollow = t
     follow,
     resume,
     stopFollowing,
+    showAtTop,
     contentRef,
     targetRef,
     scrollProps: {

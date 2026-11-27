@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { currentTimecode } from '../../lib/chapters';
 import { errorText } from '../../lib/format';
@@ -21,7 +22,7 @@ type Props = {
   time: number;
   reviews: Record<string, ReviewState>;
   runningAll: boolean;
-  /** chapter to bring into view when the panel opens */
+  /** chapter to bring into view, set when it was asked for from the timecodes */
   focusIndex?: number;
   onRunAll: () => void;
   onReview: (target: number | 'all', force?: boolean) => void;
@@ -54,10 +55,16 @@ export function AiPanel(props: Props) {
           ? `row:${currentIndex}`
           : undefined;
   // Opened on a particular chapter: stay there instead of jumping to the one being played.
-  const { follow, resume, stopFollowing, contentRef, targetRef, scrollProps } = useFollowScroll(
+  const { follow, resume, stopFollowing, showAtTop, contentRef, targetRef, scrollProps } = useFollowScroll(
     target,
     focusIndex === undefined,
   );
+  // Also when the panel is already mounted: it stays so while other modes are shown.
+  const rows = useRef(new Map<number, ViewInstance | null>());
+  useEffect(() => {
+    const row = focusIndex === undefined ? undefined : rows.current.get(focusIndex);
+    if (row) showAtTop(row);
+  }, [focusIndex, showAtTop]);
   const seek = (sec: number) => {
     onSeek(sec);
     resume();
@@ -109,11 +116,9 @@ export function AiPanel(props: Props) {
             return (
               <View
                 key={c.index}
-                onLayout={
-                  focusIndex === c.index
-                    ? (e) => scrollProps.ref.current?.scrollTo({ y: e.nativeEvent.layout.y, animated: false })
-                    : undefined
-                }
+                ref={(node) => {
+                  rows.current.set(c.index, node);
+                }}
               >
                 <View
                   ref={active && target?.startsWith('row:') ? targetRef : undefined}
