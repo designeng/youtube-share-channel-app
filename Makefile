@@ -13,6 +13,7 @@ BUMP ?= patch
 reinstall: install
 
 install:
+	adb reverse tcp:8081 tcp:8081
 	adb install -r $(APK_DEBUG)
 	adb shell monkey -p $(PKG) -c android.intent.category.LAUNCHER 1
 
