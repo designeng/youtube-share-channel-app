@@ -12,6 +12,7 @@ import { AboutPanel } from '../../components/video/AboutPanel';
 import { AiPanel, type ReviewState } from '../../components/video/AiPanel';
 import { ChaptersPanel } from '../../components/video/ChaptersPanel';
 import { DownloadBar } from '../../components/video/DownloadBar';
+import { Layer } from '../../components/video/Layer';
 import { LocalPlayer } from '../../components/LocalPlayer';
 import { ModeBar, type Mode } from '../../components/video/ModeBar';
 import { TranscriptPanel, type TrackChoice, type TrackOption } from '../../components/video/TranscriptPanel';
@@ -69,6 +70,7 @@ export default function VideoScreen() {
   const [playerError, setPlayerError] = useState<number>();
   const [mode, setMode] = useState<Mode>('chapters');
   const [aiFocus, setAiFocus] = useState<number>();
+  const [transcriptOpened, setTranscriptOpened] = useState(false);
 
   const [info, setInfo] = useState<TranscriptInfo>();
   const [choice, setChoice] = useState<TrackChoice>();
@@ -233,6 +235,7 @@ export default function VideoScreen() {
 
   const changeMode = (m: Mode) => {
     setAiFocus(undefined);
+    if (m === 'transcript') setTranscriptOpened(true);
     setMode(m);
   };
 
@@ -354,57 +357,66 @@ export default function VideoScreen() {
         )}
 
         <View style={[styles.panel, { paddingLeft: insets.left, paddingRight: insets.right }]}>
-          {mode === 'transcript' ? (
-            <TranscriptPanel
-              transcript={shown}
-              loading={!hasSaved && trLoading}
-              error={hasSaved ? undefined : trError}
-              options={savedOptions?.length ? savedOptions : trackOptions}
-              choice={savedCurrent ? choiceOf(savedCurrent) : choice}
-              time={time}
-              onChoose={hasSaved ? setChoice : selectChoice}
-              onSeek={seek}
-              // Nothing to retry when YouTube says the video has no captions at all.
-              onRetry={info && !info.tracks.length ? undefined : retryTranscript}
-              notice={notice}
-            />
-          ) : error && !video ? (
-            <ScrollView>
-              <StateView icon="alert" tone="error" title={s.video.loadFailed} message={errorText(error)}>
-                {/key|ключ/i.test(error) && (
-                  <Button icon="settings" label={s.common.openSettings} onPress={() => router.push('/settings')} />
-                )}
-                <Button variant="secondary" icon="refresh" label={s.common.retry} onPress={retryVideo} />
-              </StateView>
-            </ScrollView>
-          ) : !video ? (
-            <StateView loading message={s.video.loading} />
-          ) : mode === 'chapters' ? (
-            <ChaptersPanel
-              chapters={parts}
-              authored={hasChapters}
-              currentIndex={currentIdx}
-              time={time}
-              reviews={reviews}
-              onSeek={seek}
-              onReview={reviewFromChapters}
-            />
-          ) : mode === 'ai' ? (
-            <AiPanel
-              chapters={parts}
-              authored={hasChapters}
-              currentIndex={currentIdx}
-              time={time}
-              reviews={reviews}
-              runningAll={runningAll}
-              focusIndex={aiFocus}
-              onRunAll={runAllChapters}
-              onReview={review}
-              onSeek={seek}
-            />
-          ) : (
-            <AboutPanel video={video} onSeek={seek} />
-          )}
+          <View style={styles.layers}>
+            {mode === 'transcript' ? null : error && !video ? (
+              <ScrollView>
+                <StateView icon="alert" tone="error" title={s.video.loadFailed} message={errorText(error)}>
+                  {/key|ключ/i.test(error) && (
+                    <Button icon="settings" label={s.common.openSettings} onPress={() => router.push('/settings')} />
+                  )}
+                  <Button variant="secondary" icon="refresh" label={s.common.retry} onPress={retryVideo} />
+                </StateView>
+              </ScrollView>
+            ) : !video ? (
+              <StateView loading message={s.video.loading} />
+            ) : mode === 'ai' ? (
+              <AiPanel
+                chapters={parts}
+                authored={hasChapters}
+                currentIndex={currentIdx}
+                time={time}
+                reviews={reviews}
+                runningAll={runningAll}
+                focusIndex={aiFocus}
+                onRunAll={runAllChapters}
+                onReview={review}
+                onSeek={seek}
+              />
+            ) : mode === 'about' ? (
+              <AboutPanel video={video} onSeek={seek} />
+            ) : null}
+            {/* Kept mounted: coming back must not scroll through the list from its start. */}
+            {video && (
+              <Layer active={mode === 'chapters'}>
+                <ChaptersPanel
+                  chapters={parts}
+                  authored={hasChapters}
+                  currentIndex={currentIdx}
+                  time={time}
+                  reviews={reviews}
+                  onSeek={seek}
+                  onReview={reviewFromChapters}
+                />
+              </Layer>
+            )}
+            {transcriptOpened && (
+              <Layer active={mode === 'transcript'}>
+                <TranscriptPanel
+                  transcript={shown}
+                  loading={!hasSaved && trLoading}
+                  error={hasSaved ? undefined : trError}
+                  options={savedOptions?.length ? savedOptions : trackOptions}
+                  choice={savedCurrent ? choiceOf(savedCurrent) : choice}
+                  time={time}
+                  onChoose={hasSaved ? setChoice : selectChoice}
+                  onSeek={seek}
+                  // Nothing to retry when YouTube says the video has no captions at all.
+                  onRetry={info && !info.tracks.length ? undefined : retryTranscript}
+                  notice={notice}
+                />
+              </Layer>
+            )}
+          </View>
         </View>
 
         <ModeBar mode={mode} onChange={changeMode} />
@@ -418,6 +430,8 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   // Panels use the full height; in portrait on tablets the column stays readable.
   panel: { flex: 1, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
+  // Inside the safe-area padding of the panel: layers are positioned absolutely.
+  layers: { flex: 1 },
   fullscreen: { backgroundColor: '#000' },
   hidden: { display: 'none' },
   banner: { paddingHorizontal: space.md, paddingTop: space.sm },

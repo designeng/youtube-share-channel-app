@@ -83,19 +83,24 @@ export function TranscriptPanel({ transcript, loading, error, options, choice, t
   const following = useRef(follow);
   const retry = useRef<ReturnType<typeof setTimeout>>(undefined);
   const retries = useRef(0);
+  // A list that has just appeared goes to the current line at once; later moves are animated.
+  const placed = useRef(false);
+  const animate = useRef(false);
 
   const lines = useMemo(() => (transcript ? transcriptLines(transcript.segments, LINE_SEC) : []), [transcript]);
   const current = lineIndexAt(lines, time);
   const visible = !loading && lines.length > 0;
 
   const scrollTo = useCallback((index: number) => {
-    list.current?.scrollToIndex({ index, viewPosition: VIEW_POSITION, animated: true });
+    list.current?.scrollToIndex({ index, viewPosition: VIEW_POSITION, animated: animate.current });
   }, []);
 
   useEffect(() => {
     following.current = follow;
     clearTimeout(retry.current);
     retries.current = 0;
+    animate.current = placed.current;
+    placed.current = visible;
     if (follow && visible && current >= 0) scrollTo(current);
   }, [follow, visible, current, lines, scrollTo]);
 
